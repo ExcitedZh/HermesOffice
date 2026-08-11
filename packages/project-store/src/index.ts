@@ -1,0 +1,33 @@
+export { ProjectStore } from './store.js'
+export type {
+  ChatMessage,
+  ChatMeta,
+  ProjectData,
+  ProjectIndex,
+  ProjectInfo,
+  ProjectSummary,
+  ProjectDocumentReference,
+  ProposedChangeActor,
+  ProposedChangeApp,
+  ProposedChangeOperation,
+  ProposedChangeRecord,
+  ProposedChangeRisk,
+  ProposedChangeScope,
+  ProposedChangeScopeKind,
+  ProposedChangeStatus,
+  TimelineEntry,
+  ToolActivity,
+} from './types.js'
+export type {
+  AppendChatArgs,
+  LoadChatArgs,
+  ProjectApi,
+  ListDocumentReferencesArgs,
+  ListProposedChangesArgs,
+  RebindChatArgs,
+  ResolveChatArgs,
+  ResolveChatResult,
+  SaveProposedChangeArgs,
+  UpdateProposedChangeStatusArgs,
+  UpsertDocumentReferenceArgs,
+} from './ipc.js'

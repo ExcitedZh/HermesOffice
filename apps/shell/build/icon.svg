@@ -1,0 +1,15 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="app-grad" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop stopColor="#6E4FF6"/>
+      <stop offset="0.55" stopColor="#5A3DE0"/>
+      <stop offset="1" stopColor="#14B8A6"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1024" height="1024" rx="228" fill="url(#app-grad)"/>
+  <!-- cometa/mensageiro: rastro diagonal sutil no canto -->
+  <circle cx="820" cy="204" r="26" fill="#ffffff" opacity="0.9"/>
+  <circle cx="884" cy="140" r="14" fill="#ffffff" opacity="0.65"/>
+  <!-- monograma H -->
+  <path d="M300 300v424M724 300v424M300 512h424" stroke="#ffffff" stroke-width="104" stroke-linecap="round"/>
+</svg>

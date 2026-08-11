@@ -1,0 +1,11 @@
+<svg width="340" height="64" viewBox="0 0 340 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ho-grad" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop stopColor="#6E4FF6"/>
+      <stop offset="1" stopColor="#2DD4BF"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="10" width="44" height="44" rx="11" fill="url(#ho-grad)"/>
+  <path d="M14.5 20.5v23M31.5 20.5v23M14.5 32h17" stroke="#ffffff" stroke-width="4.6" stroke-linecap="round"/>
+  <text x="58" y="41.5" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="29" font-weight="700" fill="#252423" letter-spacing="-0.4">HermesOffice</text>
+</svg>

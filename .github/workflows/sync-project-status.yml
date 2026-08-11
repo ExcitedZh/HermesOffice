@@ -1,0 +1,41 @@
+name: sync-project-status
+
+# Keeps the "Good First Issues" GitHub Project (v2) board in sync with PR
+# lifecycle: linked issues move to "In Progress" when a PR opens and to "Done"
+# when it merges. See .github/scripts/sync-project-status.py for the logic.
+#
+# SECURITY: runs on `pull_request_target` so community PRs (from forks) trigger
+# it with access to secrets. The script is executed from the DEFAULT branch
+# (checkout pinned to `main` below), never from the fork's code; the PR body is
+# read as plain data from the GitHub-provided event JSON. No artifact from the
+# PR is checked out or executed.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, closed]
+
+permissions:
+  contents: read # only to check out this repo's own script
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      # Pinned to the default branch: the version of the script that runs is
+      # always the one reviewed on main, not the contributor's.
+      - name: Check out default branch script
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Sync linked issues on the board
+        env:
+          GH_TOKEN: ${{ secrets.PROJECTS_PAT }}
+        run: python3 .github/scripts/sync-project-status.py
+
+      - name: Dry-run trace for debugging (no writes)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.PROJECTS_PAT }}
+        run: python3 .github/scripts/sync-project-status.py --dry-run || true
