@@ -22,8 +22,10 @@ export interface AiProviderConfig {
   model: string
   maxTokens?: number
   timeoutMs?: number
-  /** only used by the custom (OpenAI-compatible) provider */
+  /** only used by the custom provider */
   baseUrl?: string | undefined
+  /** optional protocol override for custom provider (defaults to 'openai') */
+  protocol?: 'openai' | 'gemini' | 'anthropic'
 }
 
 export interface AiProviderMeta {
