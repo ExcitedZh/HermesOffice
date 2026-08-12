@@ -21,6 +21,7 @@ export interface AiProviderConfig {
   apiKey: string
   model: string
   maxTokens?: number
+  timeoutMs?: number
   /** only used by the custom (OpenAI-compatible) provider */
   baseUrl?: string | undefined
 }

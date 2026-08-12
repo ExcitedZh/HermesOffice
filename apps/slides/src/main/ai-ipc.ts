@@ -97,7 +97,14 @@ export function registerAiIpc(): void {
   })
 
   ipcMain.handle('ai:stream', async (event, request: AiStreamRequest) => {
-    const { requestId, settings, system, messages } = request
+    const { requestId, system, messages } = request
+    const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(AI_SETTINGS_PATH(), {})
+    const settings = resolveAiSettings(stored, defaultAiSettings())
+    if (stored.provider && stored.provider !== 'genspark') {
+      settings.provider = stored.provider
+    } else {
+      settings.provider = 'hermes'
+    }
     const tools = request.tools ?? []
     const provider = settings.provider
     let config = settings.providers?.[provider]

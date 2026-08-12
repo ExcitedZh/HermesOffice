@@ -127,6 +127,7 @@ export function AiPanel({
       skill: createPdfSkill(deps),
       systemSuffix: () => aiLangDirective(langRef.current) + HERMES_COMMANDS,
       captureSnapshot: () => apiRef.current.captureEditState(),
+      maxTurns: 100,
       events: {
         onText: (text) => {
           setPhase('replying')

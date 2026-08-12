@@ -2175,9 +2175,16 @@ export function registerSheetsAiIpc(): void {
     const entry = sessionFor(event)
     const request = aiStreamRequestSchema.parse(input)
     const { requestId, system, messages } = request
+    const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {})
+    const settings = resolveAiSettings(stored, defaultAiSettings())
+    if (stored.provider && stored.provider !== 'genspark') {
+      settings.provider = stored.provider as AiProviderId
+    } else {
+      settings.provider = 'hermes'
+    }
     const tools = request.tools ?? []
-    const provider = request.settings.provider as AiProviderId
-    let config = request.settings.providers[provider]
+    const provider = settings.provider
+    let config = settings.providers[provider]
     const maxTokens = config?.maxTokens ?? request.maxTokens ?? 8192
     // Genspark's key never enters the settings file; it is read from the gsk
     // login state per request

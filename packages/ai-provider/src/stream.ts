@@ -6,8 +6,12 @@ import {
   gensparkAttributionHeaders,
 } from './providers'
 import { ensureHermesGatewayHealthy } from './hermes-health'
-import type { AiProviderConfig, AiProviderId } from './types'
-import { createStreamWatchdog, type StreamWatchdog } from './watchdog'
+import {
+  AI_CONNECT_TIMEOUT_MS,
+  AI_IDLE_TIMEOUT_MS,
+  createStreamWatchdog,
+  type StreamWatchdog,
+} from './watchdog'
 
 // ---- streaming (SSE line splitting shared by all providers) ----
 
@@ -257,7 +261,8 @@ export async function streamAnthropic(
   cb: StreamCallbacks,
   baseUrl = 'https://api.anthropic.com',
 ): Promise<void> {
-  const wd = createStreamWatchdog(cb.signal)
+  const idleMs = config.timeoutMs ?? AI_IDLE_TIMEOUT_MS
+  const wd = createStreamWatchdog(cb.signal, AI_CONNECT_TIMEOUT_MS, idleMs)
   return wd.guard(() => anthropicTurn(config, system, messages, tools, maxTokens, cb, baseUrl, wd))
 }
 
@@ -492,7 +497,8 @@ export async function streamGemini(
   cb: StreamCallbacks,
   baseUrl = 'https://generativelanguage.googleapis.com/v1beta',
 ): Promise<void> {
-  const wd = createStreamWatchdog(cb.signal)
+  const idleMs = config.timeoutMs ?? AI_IDLE_TIMEOUT_MS
+  const wd = createStreamWatchdog(cb.signal, AI_CONNECT_TIMEOUT_MS, idleMs)
   return wd.guard(() => geminiTurn(config, system, messages, tools, maxTokens, cb, baseUrl, wd))
 }
 
@@ -705,7 +711,8 @@ export async function streamOpenAiCompatible(
   cb: StreamCallbacks,
   sessionId?: string,
 ): Promise<void> {
-  const wd = createStreamWatchdog(cb.signal)
+  const idleMs = config.timeoutMs ?? AI_IDLE_TIMEOUT_MS
+  const wd = createStreamWatchdog(cb.signal, AI_CONNECT_TIMEOUT_MS, idleMs)
   return wd.guard(() =>
     openAiCompatibleTurn(baseUrl, config, system, messages, tools, maxTokens, cb, wd, sessionId),
   )

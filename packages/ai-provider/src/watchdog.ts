@@ -5,16 +5,15 @@
  * otherwise leaves the request pending forever and the UI stuck busy.
  */
 
-export const AI_CONNECT_TIMEOUT_MS = 60_000
+export const AI_CONNECT_TIMEOUT_MS = 120_000
 /**
- * Generous on purpose: on long-context requests the gateway can legitimately go
+ * Generous on purpose: on long-context requests or deep reasoning models the gateway can legitimately go
  * silent for minutes (thinking/buffering before the first token and between
- * chunks). 60s here killed real in-progress generations that were still billed,
- * so only genuinely dead connections should trip this.
+ * chunks). 10 minutes here allows long generations without premature watchdog aborts.
  */
-export const AI_IDLE_TIMEOUT_MS = 180_000
+export const AI_IDLE_TIMEOUT_MS = 600_000
 /** Non-streaming chat waits for the full generation before headers arrive */
-export const AI_CHAT_RESPONSE_TIMEOUT_MS = 180_000
+export const AI_CHAT_RESPONSE_TIMEOUT_MS = 600_000
 
 export class AiTimeoutError extends Error {
   constructor(ms: number) {

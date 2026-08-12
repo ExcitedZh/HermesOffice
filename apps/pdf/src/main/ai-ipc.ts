@@ -61,6 +61,14 @@ export function registerPdfAiIpc(): void {
   })
 
   ipcMain.handle('ai:stream', async (event, request: AiStreamRequest) => {
+    const requestId = request.requestId
+    const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(AI_SETTINGS_PATH(), {})
+    const settings = resolveAiSettings(stored, defaultAiSettings())
+    if (stored.provider && stored.provider !== 'genspark') {
+      settings.provider = stored.provider
+    } else {
+      settings.provider = 'hermes'
+    }
     const tools = request.tools ?? []
     const provider = settings.provider
     const config = settings.providers?.[provider]

@@ -1077,7 +1077,7 @@ export function AiPanel({
         ),
       ]),
       // Page-by-page deck generation needs more tool rounds
-      maxTurns: 24,
+      maxTurns: 100,
       events: {
         onText: (text) => patchLastAssistant({ text }),
         onToolStart: (call) => {
@@ -1677,7 +1677,7 @@ export function AiPanel({
               {entry.error && (
                 <div className="ai-msg-error">{t('aiMsgError', { error: entry.error })}</div>
               )}
-              {entry.loginRequired && (
+              {entry.loginRequired && settings.provider === 'genspark' && (
                 <button
                   className="ai-login-btn"
                   onClick={() => void window.slidesApi.aiGatewayLogin()}

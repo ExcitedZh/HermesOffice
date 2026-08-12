@@ -474,7 +474,7 @@ export function AiChatPanel({
                     </button>
                   </div>
                 )}
-                {entry.loginRequired && (
+                {entry.loginRequired && settings.provider === 'genspark' && (
                   <button
                     className="ai-login-btn"
                     onClick={() => void window.desktopApi.aiGatewayLogin()}
