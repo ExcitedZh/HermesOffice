@@ -35,10 +35,23 @@ const activeAiStreams = new Map<string, AbortController>()
 
 export function registerPdfAiIpc(): void {
   ipcMain.handle('ai:get-settings', (): AiSettings => {
-    const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(AI_SETTINGS_PATH(), {})
+    const filePath = AI_SETTINGS_PATH()
+    if (!existsSync(filePath)) {
+      const defaults = defaultAiSettings()
+      try {
+        mkdirSync(join(filePath, '..'), { recursive: true })
+        writeFileSync(filePath, JSON.stringify(defaults, null, 2))
+      } catch {
+        /* ignore */
+      }
+    }
+    const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(filePath, {})
     const settings = resolveAiSettings(stored, defaultAiSettings())
-    // AI features all go through Hermes; stored settings that chose another provider are normalized back
-    settings.provider = 'hermes'
+    if (stored.provider && stored.provider !== 'genspark') {
+      settings.provider = stored.provider
+    } else {
+      settings.provider = 'hermes'
+    }
     return settings
   })
 
@@ -48,11 +61,18 @@ export function registerPdfAiIpc(): void {
   })
 
   ipcMain.handle('ai:stream', async (event, request: AiStreamRequest) => {
-    const { requestId, settings, system, messages } = request
+    const { requestId, system, messages } = request
+    const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(AI_SETTINGS_PATH(), {})
+    const settings = resolveAiSettings(stored, defaultAiSettings())
+    if (stored.provider && stored.provider !== 'genspark') {
+      settings.provider = stored.provider
+    } else {
+      settings.provider = 'hermes'
+    }
     const tools = request.tools ?? []
-    const maxTokens = request.maxTokens ?? 8192
     const provider = settings.provider
     const config = settings.providers?.[provider]
+    const maxTokens = config?.maxTokens ?? request.maxTokens ?? 8192
     const send = (chunk: AiStreamChunk) => {
       if (!event.sender.isDestroyed()) event.sender.send('ai:stream-chunk', chunk)
     }

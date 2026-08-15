@@ -2115,11 +2115,23 @@ export function registerSheetsAiIpc(): void {
 
   ipcMain.handle(IPC_CHANNELS.aiGetSettings, (event): AiSettings => {
     sessionFor(event)
-    const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {})
+    const filePath = SETTINGS_PATH()
+    if (!existsSync(filePath)) {
+      const defaults = defaultAiSettings()
+      try {
+        mkdirSync(join(filePath, '..'), { recursive: true })
+        writeFileSync(filePath, JSON.stringify(defaults, null, 2))
+      } catch {
+        /* ignore */
+      }
+    }
+    const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(filePath, {})
     const settings = resolveAiSettings(stored, defaultAiSettings())
-    // AI features all go through Genspark (gsk login); legacy settings that chose
-    // another provider are reset
-    settings.provider = 'hermes'
+    if (stored.provider && stored.provider !== 'genspark') {
+      settings.provider = stored.provider
+    } else {
+      settings.provider = 'hermes'
+    }
     return settings
   })
 
@@ -2171,10 +2183,17 @@ export function registerSheetsAiIpc(): void {
     const entry = sessionFor(event)
     const request = aiStreamRequestSchema.parse(input)
     const { requestId, system, messages } = request
+    const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {})
+    const settings = resolveAiSettings(stored, defaultAiSettings())
+    if (stored.provider && stored.provider !== 'genspark') {
+      settings.provider = stored.provider as AiProviderId
+    } else {
+      settings.provider = 'hermes'
+    }
     const tools = request.tools ?? []
-    const maxTokens = request.maxTokens ?? 8192
-    const provider = request.settings.provider as AiProviderId
-    let config = request.settings.providers[provider]
+    const provider = settings.provider
+    let config = settings.providers[provider]
+    const maxTokens = config?.maxTokens ?? request.maxTokens ?? 8192
     // Genspark's key never enters the settings file; it is read from the gsk
     // login state per request
     if (provider === 'genspark' && config && !config.apiKey) {

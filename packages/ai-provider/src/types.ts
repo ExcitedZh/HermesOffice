@@ -20,8 +20,12 @@ export type GatewayAccountStatus = GenSparkAccountStatus
 export interface AiProviderConfig {
   apiKey: string
   model: string
-  /** only used by the custom (OpenAI-compatible) provider */
+  maxTokens?: number
+  timeoutMs?: number
+  /** only used by the custom provider */
   baseUrl?: string | undefined
+  /** optional protocol override for custom provider (defaults to 'openai') */
+  protocol?: 'openai' | 'gemini' | 'anthropic'
 }
 
 export interface AiProviderMeta {

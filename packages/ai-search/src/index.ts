@@ -14,12 +14,34 @@ import {
   type WebSearchResult,
 } from './shared'
 import { gskImageSearch, gskWebSearch, hasGskAuth } from './gsk'
+import { existsSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 
 export type { ImageSearchResult, WebSearchResult } from './shared'
 export * from './gsk'
 export * from './hermesoffice-auth'
 
-const SERPER_KEY = () => process.env.SERPER_API_KEY ?? ''
+/**
+ * Serper API key: SERPER_API_KEY env var first, then a config-file fallback so
+ * the packaged app (double-click launch, no terminal env) can read it too.
+ * File: ~/.hermesoffice/serper.json → {"api_key": "..."} (same dir as gsk auth).
+ */
+function serperConfigPath(): string {
+  return join(process.env.HERMESOFFICE_AUTH_DIR || join(homedir(), '.hermesoffice'), 'serper.json')
+}
+
+const SERPER_KEY = (): string => {
+  if (process.env.SERPER_API_KEY) return process.env.SERPER_API_KEY
+  try {
+    const configPath = serperConfigPath()
+    if (!existsSync(configPath)) return ''
+    const config = JSON.parse(readFileSync(configPath, 'utf-8')) as { api_key?: string }
+    return typeof config.api_key === 'string' && config.api_key ? config.api_key : ''
+  } catch {
+    return ''
+  }
+}
 
 // ── Web search ──────────────────────────────────────────────────────
 

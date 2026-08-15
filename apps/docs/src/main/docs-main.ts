@@ -45,6 +45,7 @@ import {
   resolveAiSettings,
   streamForProvider,
   type AiChatRequest,
+  type AiProviderId,
   type AiSettings,
   type AiStreamChunk,
   type AiStreamRequest,
@@ -2582,10 +2583,23 @@ export function registerAiIpc(): void {
   registerDocxTrackIpc()
   registerExportMarkdownIpc()
   ipcMain.handle('ai:get-settings', (): AiSettings => {
-    const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {})
+    const filePath = SETTINGS_PATH()
+    if (!existsSync(filePath)) {
+      const defaults = defaultAiSettings()
+      try {
+        mkdirSync(join(filePath, '..'), { recursive: true })
+        writeFileSync(filePath, JSON.stringify(defaults, null, 2))
+      } catch {
+        /* ignore */
+      }
+    }
+    const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(filePath, {})
     const settings = resolveAiSettings(stored, defaultAiSettings())
-    // AI features all go through Genspark (gsk login); legacy settings with another provider are reset
-    settings.provider = 'hermes'
+    if (stored.provider && stored.provider !== 'genspark') {
+      settings.provider = stored.provider as AiProviderId
+    } else {
+      settings.provider = 'hermes'
+    }
     return settings
   })
 
@@ -2609,11 +2623,18 @@ export function registerAiIpc(): void {
   })
 
   ipcMain.handle('ai:stream', async (event, request: AiStreamRequest) => {
-    const { requestId, settings, system, messages } = request
+    const { requestId, system, messages } = request
+    const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {})
+    const settings = resolveAiSettings(stored, defaultAiSettings())
+    if (stored.provider && stored.provider !== 'genspark') {
+      settings.provider = stored.provider as AiProviderId
+    } else {
+      settings.provider = 'hermes'
+    }
     const tools = request.tools ?? []
-    const maxTokens = request.maxTokens ?? 8192
     const provider = settings.provider
     let config = settings.providers?.[provider]
+    const maxTokens = config?.maxTokens ?? request.maxTokens ?? 8192
     // the genspark key never enters the settings file; requests take it from the gsk login state
     if (provider === 'genspark' && config && !config.apiKey) {
       config = { ...config, apiKey: gskApiKey() }
