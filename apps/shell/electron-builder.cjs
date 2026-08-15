@@ -20,6 +20,21 @@ const { join } = require('node:path')
 
 const updateUrl = process.env.HERMESOFFICE_UPDATE_URL
 
+// The @firecrawl/anydoc native loader resolves the platform package matching
+// the running OS/arch (see its optionalDependencies: darwin-x64/arm64,
+// linux-x64-gnu/musl, win32-x64-msvc, …). Map the build host to that package
+// name so the installer ships the native binary the app actually spawns.
+function anydocPlatformPackage() {
+  const arch = process.arch === 'arm64' ? 'arm64' : 'x64'
+  if (process.platform === 'darwin') return `@firecrawl/anydoc-darwin-${arch}`
+  if (process.platform === 'win32') return `@firecrawl/anydoc-win32-x64-msvc`
+  if (process.platform === 'linux') {
+    const musl = (process.report.getReport().header.glibcVersionRuntime ?? '') === ''
+    return `@firecrawl/anydoc-linux-${arch}-${musl ? 'musl' : 'gnu'}`
+  }
+  return `@firecrawl/anydoc-${process.platform}-${arch}`
+}
+
 // GENOFFICE_MAC_X64=1 — opt into packaging the Intel (x64) dmg/zip alongside
 // arm64. Off by default: Intel packages must only ever ship signed with the
 // company certificate (planned dual-track pipeline), so the current release
@@ -38,16 +53,23 @@ const includeMacX64 = process.env.GENOFFICE_MAC_X64 === '1'
 // script was replaced by the lazy `install-electron` bin), and electron-builder
 // exits 0 on a missing extraResources source, so without this check the
 // installer would silently ship without the Chromium license.
-for (const rel of [
+//
+// @firecrawl/anydoc-darwin-arm64 is a macOS-only optional dependency: on
+// Windows/Linux `npm ci` does not install it, so it must only be required when
+// actually building for macOS.
+const REQUIRED_EXTRA_RESOURCES = [
   '../../node_modules/@genspark/cli',
   '../../node_modules/@genspark/cli/node_modules/commander',
   '../../node_modules/ws',
   '../../node_modules/electron/dist/LICENSES.chromium.html',
   '../../node_modules/@firecrawl/anydoc',
-  '../../node_modules/@firecrawl/anydoc-darwin-arm64',
   '../../node_modules/@embedpdf/pdfium/dist/pdfium.wasm',
   '../pdf/node_modules/harfbuzzjs/hb-subset.wasm',
-]) {
+]
+if (process.platform === 'darwin') {
+  REQUIRED_EXTRA_RESOURCES.push('../../node_modules/@firecrawl/anydoc-darwin-arm64')
+}
+for (const rel of REQUIRED_EXTRA_RESOURCES) {
   if (!existsSync(join(__dirname, rel))) {
     throw new Error(
       `electron-builder extraResources source missing: ${rel} (npm hoisting changed?)`,
@@ -175,9 +197,12 @@ const config = {
       from: '../../node_modules/@firecrawl/anydoc',
       to: 'anydoc/node_modules/@firecrawl/anydoc',
     },
+    // @firecrawl/anydoc ships per-platform optional native packages; include
+    // the one matching the current build host (macOS arm64 for the mac build,
+    // win32 for the Windows build, etc.).
     {
-      from: '../../node_modules/@firecrawl/anydoc-darwin-arm64',
-      to: 'anydoc/node_modules/@firecrawl/anydoc-darwin-arm64',
+      from: `../../node_modules/${anydocPlatformPackage()}`,
+      to: `anydoc/node_modules/${anydocPlatformPackage()}`,
     },
   ],
   // `mimeType` is read only by the Linux target, where it becomes the
