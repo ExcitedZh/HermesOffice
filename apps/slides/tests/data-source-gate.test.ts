@@ -147,16 +147,15 @@ describe('edit_chart provenance gate', () => {
 })
 
 describe('brief provenance gate (regenerate_slide / generate_deck)', () => {
-  const cloudAccess = () =>
+  const localAccess = () =>
     mkAccess({
       regenerateSlide: async () => null,
-      generatePageCloud: async () => ({ ok: false, error: 'cloud down' }),
-      isCloudPageGenEnabled: async () => true,
+      generatePageLocal: async () => ({ ok: false, error: 'local gen down' }),
       generateFromHtml: async () => ({ ok: true, pages: 1 }),
     })
 
   it('regenerate_slide with a figure-dense brief refuses without dataSource', async () => {
-    const r = await createSlidesSkill(cloudAccess()).executeTool!({
+    const r = await createSlidesSkill(localAccess()).executeTool!({
       id: 't',
       name: 'regenerate_slide',
       input: { slideIndex: 0, brief: '2023 年营收 48 亿，同比增长 12.5%，客单价 ¥21.8' },
@@ -166,7 +165,7 @@ describe('brief provenance gate (regenerate_slide / generate_deck)', () => {
   })
 
   it('regenerate_slide with a figure-free brief is not gated', async () => {
-    const r = await createSlidesSkill(cloudAccess()).executeTool!({
+    const r = await createSlidesSkill(localAccess()).executeTool!({
       id: 't',
       name: 'regenerate_slide',
       input: { slideIndex: 0, brief: 'Redo this page as a three column card layout' },
@@ -176,7 +175,7 @@ describe('brief provenance gate (regenerate_slide / generate_deck)', () => {
   })
 
   it('generate_deck with figure-dense briefs refuses without dataSource', async () => {
-    const r = await createSlidesSkill(cloudAccess()).executeTool!({
+    const r = await createSlidesSkill(localAccess()).executeTool!({
       id: 't',
       name: 'generate_deck',
       input: {

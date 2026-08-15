@@ -1,5 +1,5 @@
 /**
- * Post-generation layout QC: each cloud-generated page gets one focused vision pass —
+ * Post-generation layout QC: each AI-generated page gets one focused vision pass —
  * screenshot + element inventory → a restricted agent fixes objective layout defects
  * with execute_slide_script. Runs in its own AgentLoop per page (fresh context, so the
  * QC cost doesn't ride on the main conversation), orchestrated by AiPanel.

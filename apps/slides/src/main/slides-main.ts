@@ -20,11 +20,12 @@ import {
 import type { WebContents } from 'electron'
 import { execFile } from 'node:child_process'
 import { readFile, writeFile, rm, stat, mkdir, open } from 'node:fs/promises'
-import { createHash, randomUUID } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync } from 'node:fs'
 import { userInfo } from 'node:os'
 import { dirname, join } from 'node:path'
-import { gskApiKey, gskSlideGenerate, setGskProxyUrl } from '@hermesoffice/ai-search'
+import { setGskProxyUrl } from '@hermesoffice/ai-search'
+import { convertHtmlPage } from './html-to-pptx'
 import {
   appMenuLabels,
   contextMenuLabels,
@@ -260,11 +261,6 @@ let slideClipboard: { bundle: SlideBundle; png?: string } | null = null
 
 /** The immediately preceding slide paste per webContents, so the paste-options floater can redo it with another mode. */
 const lastSlidePaste = new Map<number, { afterIndex: number; undoLen: number }>()
-
-// Cloud-generated single-page pptx: marker strings travel in pagesHtml slots; only paths issued
-// by slides:cloud-page-generate are readable (the renderer can't point the reader at arbitrary files)
-const CLOUD_PAGE_PREFIX = 'cloudpptx:'
-const issuedCloudPages = new Set<string>()
 import { registerPresenterIpc } from './presenter-show'
 import { registerAttachmentIpc } from './attachments-ipc'
 
@@ -1291,57 +1287,9 @@ export function registerSlidesIpc(): void {
     )
     return rebuildSlide(session, op.slideIndex)
   })
-  // ── Cloud single-page generation (gsk slide_generate): brief → cloud HTML+conversion → one-slide
-  // pptx saved to a temp file. Returns a marker string that flows through the same pagesHtml slots
-  // as locally generated HTML; slides:html-to-pptx recognizes it and reads the bytes instead of
-  // converting. Enabled when gsk is logged in; HERMESOFFICE_CLOUD_SLIDE=0 is the kill switch.
-  const cloudSlideEnabled = () => process.env.HERMESOFFICE_CLOUD_SLIDE !== '0' && !!gskApiKey()
-
-  ipcMain.handle('slides:cloud-gen-status', () => ({ enabled: cloudSlideEnabled() }))
-
-  ipcMain.handle(
-    'slides:cloud-page-generate',
-    async (
-      _e,
-      op: {
-        brief: string
-        title?: string
-        styleSkill?: string
-        deckContext?: Record<string, unknown>
-        images?: { url: string; caption?: string }[]
-        width?: number
-        height?: number
-      },
-    ): Promise<{ ok: boolean; marker?: string; error?: string }> => {
-      if (!cloudSlideEnabled()) return { ok: false, error: 'cloud slide generation is disabled' }
-      try {
-        // ultra = opus-class model, matching the local path's quality tier; HERMESOFFICE_CLOUD_SLIDE_TIER=standard opts down
-        const tier = process.env.HERMESOFFICE_CLOUD_SLIDE_TIER === 'standard' ? 'standard' : 'ultra'
-        const started = Date.now()
-        const { bytes, model } = await gskSlideGenerate({
-          tier,
-          brief: String(op.brief ?? ''),
-          title: op.title ? String(op.title) : undefined,
-          styleSkill: op.styleSkill ? String(op.styleSkill) : undefined,
-          deckContext: op.deckContext,
-          images: Array.isArray(op.images) ? op.images : undefined,
-          width: op.width,
-          height: op.height,
-        })
-        console.log(
-          `[cloud-slide] page generated: tier=${tier} model=${model} bytes=${bytes.length} ms=${Date.now() - started}`,
-        )
-        const dir = join(app.getPath('temp'), 'hermesoffice-cloud-pages')
-        mkdirSync(dir, { recursive: true })
-        const path = join(dir, `${randomUUID()}.pptx`)
-        await writeFile(path, bytes)
-        issuedCloudPages.add(path)
-        return { ok: true, marker: CLOUD_PAGE_PREFIX + path }
-      } catch (err) {
-        return { ok: false, error: err instanceof Error ? err.message : String(err) }
-      }
-    },
-  )
+  // ── Slide generation is fully local: each page's HTML is converted to an editable
+  // single-slide pptx here (see html-to-pptx.ts) and merged into the deck by
+  // slides:html-to-pptx. No gsk cloud service / login is required.
 
   ipcMain.handle(
     'slides:html-to-pptx',
@@ -1362,22 +1310,26 @@ export function registerSlidesIpc(): void {
         })
       | { error: string }
     > => {
-      // Every page arrives as a cloud marker (cloudpptx:<path> written by
-      // slides:cloud-page-generate, pointing at a one-slide pptx temp file); this handler only
-      // reads and lands the bytes.
+      // Every page arrives as locally generated HTML written by the LLM; this handler
+      // converts each page to an editable single-slide pptx (html-to-pptx.ts) and lands it.
       // replace: assemble the whole batch into one multi-page pptx as the new deck base.
       // append: merge the "new pages" one by one into the existing deck via mergeSlideFromPptx
       // (earlier pages are untouched).
-      const readCloudPage = async (marker: string): Promise<{ bytes: Uint8Array }> => {
-        if (!marker.startsWith(CLOUD_PAGE_PREFIX)) throw new Error('expected a cloud page marker')
-        const path = marker.slice(CLOUD_PAGE_PREFIX.length)
-        if (!issuedCloudPages.has(path)) throw new Error('unknown cloud page marker')
-        return { bytes: new Uint8Array(await readFile(path)) }
+      const pageNo = (pageIndex: number) => pageIndex + 1
+      const pageImageFailures: { page: number; url: string }[] = []
+      let pageCursor = 0
+      const pageToBytes = async (html: string): Promise<Uint8Array> => {
+        const pageIndex = pageCursor++
+        const converted = await convertHtmlPage(html)
+        for (const url of converted.imageFailures) {
+          pageImageFailures.push({ page: pageNo(pageIndex), url })
+        }
+        return converted.bytes
       }
       const assembleDeck = async (): Promise<{ bytes: Uint8Array }> => {
-        const perPage = await Promise.all(pagesHtml.map(readCloudPage))
-        const base = await openPptx(perPage[0]!.bytes)
-        for (const one of perPage.slice(1)) await mergeSlideFromPptx(base, one.bytes)
+        const perPage = await Promise.all(pagesHtml.map(pageToBytes))
+        const base = await openPptx(perPage[0]!)
+        for (const one of perPage.slice(1)) await mergeSlideFromPptx(base, one)
         for (const s of base.deck.slides) promoteSlideBackground(s, base.deck.size)
         return { bytes: await savePptx(base) }
       }
@@ -1401,8 +1353,8 @@ export function registerSlidesIpc(): void {
           let lastErr: string | undefined
           for (const html of pagesHtml) {
             try {
-              const one = await readCloudPage(html)
-              const slide = await mergeSlideFromPptx(opened, one.bytes)
+              const bytes = await pageToBytes(html)
+              const slide = await mergeSlideFromPptx(opened, bytes)
               if (slide) {
                 promoteSlideBackground(slide, opened.deck.size)
                 merged += 1
@@ -1432,6 +1384,7 @@ export function registerSlidesIpc(): void {
             size: { cx: existing.opened.deck.size.cx, cy: existing.opened.deck.size.cy },
             defaultFont: deckDefaultFont(existing.opened),
             appendedFrom: beforeCount,
+            ...(pageImageFailures.length ? { imageFailures: pageImageFailures } : {}),
             ...(lastErr && merged < pagesHtml.length
               ? { fallbackReason: tm('errPartialAppend', { reason: lastErr }) }
               : {}),
@@ -1456,13 +1409,13 @@ export function registerSlidesIpc(): void {
           if (!html || pagesHtml.length !== 1) {
             return { error: tm('errReplaceNeedsOne') }
           }
-          const one = await readCloudPage(html)
+          const pageBytes = await pageToBytes(html)
           pushHistory(existing)
           const rollback = () => {
             const snap = existing.undoStack.pop()
             if (snap) restoreSnapshot(existing, snap)
           }
-          const merged = await mergeSlideFromPptx(opened, one.bytes)
+          const merged = await mergeSlideFromPptx(opened, pageBytes)
           if (!merged) {
             rollback()
             return { error: tm('errMergeFailed') }
@@ -1486,6 +1439,7 @@ export function registerSlidesIpc(): void {
             size: { cx: existing.opened.deck.size.cx, cy: existing.opened.deck.size.cy },
             defaultFont: deckDefaultFont(existing.opened),
             replacedIndex: atIndex,
+            ...(pageImageFailures.length ? { imageFailures: pageImageFailures } : {}),
           }
         }
 
@@ -1506,13 +1460,13 @@ export function registerSlidesIpc(): void {
           if (!html || pagesHtml.length !== 1) {
             return { error: tm('errInsertNeedsOne') }
           }
-          const one = await readCloudPage(html)
+          const pageBytes = await pageToBytes(html)
           pushHistory(existing)
           const rollback = () => {
             const snap = existing.undoStack.pop()
             if (snap) restoreSnapshot(existing, snap)
           }
-          const merged = await mergeSlideFromPptx(opened, one.bytes)
+          const merged = await mergeSlideFromPptx(opened, pageBytes)
           if (!merged) {
             rollback()
             return { error: tm('errMergeFailed') }
@@ -1536,6 +1490,7 @@ export function registerSlidesIpc(): void {
             size: { cx: existing.opened.deck.size.cx, cy: existing.opened.deck.size.cy },
             defaultFont: deckDefaultFont(existing.opened),
             insertedIndex: atIndex,
+            ...(pageImageFailures.length ? { imageFailures: pageImageFailures } : {}),
           }
         }
 
@@ -1560,6 +1515,7 @@ export function registerSlidesIpc(): void {
           slides: buildAllRenderSlides(opened, fitWidthPx),
           size: { cx: opened.deck.size.cx, cy: opened.deck.size.cy },
           defaultFont: deckDefaultFont(opened),
+          ...(pageImageFailures.length ? { imageFailures: pageImageFailures } : {}),
         }
       } catch (err) {
         return { error: err instanceof Error ? err.message : String(err) }

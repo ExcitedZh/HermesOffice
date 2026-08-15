@@ -1034,18 +1034,6 @@ export interface SlidesApi {
       })
     | { error: string }
   >
-  /** Whether cloud single-page generation (gsk slide_generate) is available (GENOFFICE_CLOUD_SLIDE=1 + gsk login) */
-  cloudGenStatus: () => Promise<{ enabled: boolean }>
-  /** Cloud single-page generation: brief → one-slide pptx temp file; the marker goes into an htmlToPptx pagesHtml slot in place of HTML */
-  cloudGeneratePage: (op: {
-    brief: string
-    title?: string
-    styleSkill?: string
-    deckContext?: Record<string, unknown>
-    images?: { url: string; caption?: string }[]
-    width?: number
-    height?: number
-  }) => Promise<{ ok: boolean; marker?: string; error?: string }>
   editText: (op: EditTextOp) => Promise<RenderSlide | null>
   /** Change font/size on selected elements wholesale (elements without text ignored; returns null if all ignored) */
   setElementFont: (op: SetElementFontOp) => Promise<RenderSlide | null>

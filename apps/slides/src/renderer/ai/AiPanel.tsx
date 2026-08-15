@@ -841,41 +841,34 @@ export function AiPanel({
           setActiveClarify(questions)
         })
       },
-      isCloudPageGenEnabled: async () => {
-        try {
-          return !!(await window.slidesApi.cloudGenStatus())?.enabled
-        } catch {
-          return false
-        }
-      },
-      // Cloud single-page generation (gsk slide_generate): the cloud service owns HTML writing +
-      // pptx conversion; the deck-level style/outline stay local.
-      generatePageCloud: async (args) => {
-        try {
-          const briefParts = [args.brief]
-          if (args.layout) briefParts.push(`Layout intent: ${args.layout}`)
-          if (args.context)
-            briefParts.push(
-              `Reference material (all real names/figures/facts come from here; do not invent):\n${args.context.slice(0, 4000)}`,
-            )
-          const res = await window.slidesApi.cloudGeneratePage({
-            brief: briefParts.join('\n\n'),
-            title: args.title,
-            styleSkill: args.style,
-            deckContext: {
-              ...(args.topic ? { topic: args.topic } : {}),
-              core_hook: args.coreHook,
-              page_index: args.pageIndex,
-              total_pages: args.totalPages,
-            },
-            images: args.images.map((u) => ({ url: u })),
-            width: args.canvasW,
-            height: args.canvasH,
-          })
-          return res ?? { ok: false, error: tGlobal('aiErrUnknown') }
-        } catch (e) {
-          return { ok: false, error: e instanceof Error ? e.message : String(e) }
-        }
+      // In-tool single-page generation (fully local): the configured LLM writes one page of
+      // HTML (constrained schema, see the prompt), and the main process converts it to editable
+      // native pptx elements. No gsk cloud service / login is involved.
+      generatePageLocal: async (args) => {
+        const sys =
+          'You are a professional slide visual designer. Write ONE slide as a single HTML page using the constrained schema below. Output ONLY the HTML, no explanations, no markdown/code fences.\n\n' +
+          'Canvas: 1280 x 720 px. Root: <div id="slide" style="background:#XXXXXX"> ... </div>. All boxes are absolutely positioned with inline styles: position:absolute;left:px;top:px;width:px;height:px (px optional). Use exact hex colors from the Style Skill. No external CSS, no scripts, no <html>/<head>/<body> wrapper and no <style> tag — inline styles only.\n\n' +
+          'Supported structure (all inside #slide):\n' +
+          '- Text box: <div style="position:absolute;left:..;top:..;width:..;height:..;background:#..(optional)"><h1|h2|h3 style="font-size:..;color:#..;text-align:left|center|right">..</h1|h2|h3><p style="font-size:..;color:#..">..</p><ul><li style="font-size:..;color:#..">..</li></ul></div>\n' +
+          '- Picture: <img src="REAL_URL" style="position:absolute;left:..;top:..;width:..;height:.."> — only use real http(s) image URLs given to you; never invent or use placeholder services. If no real URL for a slot, use a colored shape + text instead of an image.\n' +
+          '- Colored panel/card: <div style="position:absolute;..;background:#..;border-radius:.."><h3>..</h3><p>..</p></div>\n' +
+          '- Table: <table style="position:absolute;left:..;top:..;width:..;height:.."><tr><td>..</td>..</tr></table>\n\n' +
+          'Rules: fill the canvas edge-to-edge; use the real names/figures/facts from the reference material (never invent percentages or "XX%" placeholders); pick a layout that serves the content; keep text readable (body >= 16px, titles 28-60px); respect the Style Skill colors and fonts for a consistent deck.\n\n' +
+          'Style Skill (use these colors/fonts):\n' + (args.style || '')
+        const parts = [
+          `Page ${args.pageIndex}/${args.totalPages} — title: ${args.title}`,
+          `Brief: ${args.brief}`,
+          args.layout ? `Layout intent: ${args.layout}` : '',
+          args.coreHook ? `Deck core hook: ${args.coreHook}` : '',
+          args.images?.length
+            ? `Real image URLs to use (map them to <img src> slots):\n${args.images.join('\n')}`
+            : 'No real images available for this page.',
+          args.context ? `Reference material (all real names/figures/facts come from here; do not invent):\n${args.context.slice(0, 4000)}` : '',
+        ].filter(Boolean)
+        const r = await runLlmOnce(sys, parts.join('\n\n'), undefined, true, args.signal, 4000)
+        return r.ok && r.text
+          ? { ok: true, html: r.text.trim() }
+          : { ok: false, error: r.error ?? tGlobal('aiErrEmptyOutput') }
       },
       // ── In-tool planning: given topic+page count, the LLM produces a structured outline (batched recursion scheduled by the skill).
       // Fixes "missing pages at the input side" at the root: the main agent doesn't hand-write dozens of pages of pages JSON.

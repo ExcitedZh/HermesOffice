@@ -106,16 +106,6 @@ const api: SlidesApi = {
     atIndex?: number,
     deckName?: string,
   ) => ipcRenderer.invoke('slides:html-to-pptx', pagesHtml, fitWidthPx, mode, atIndex, deckName),
-  cloudGenStatus: () => ipcRenderer.invoke('slides:cloud-gen-status'),
-  cloudGeneratePage: (op: {
-    brief: string
-    title?: string
-    styleSkill?: string
-    deckContext?: Record<string, unknown>
-    images?: { url: string; caption?: string }[]
-    width?: number
-    height?: number
-  }) => ipcRenderer.invoke('slides:cloud-page-generate', op),
   editText: (op: EditTextOp) => ipcRenderer.invoke('slides:edit-text', op),
   setElementFont: (op: SetElementFontOp) => ipcRenderer.invoke('slides:set-element-font', op),
   setElementParagraphFormat: (op: SetElementParagraphFormatOp) =>
