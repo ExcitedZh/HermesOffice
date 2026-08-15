@@ -35,6 +35,17 @@ jobs:
     - name: Install Dependencies
       run: npm ci
 
+    # dist:win expects the xlsx sidecar at the MinGW/GNU target path, but on
+    # Windows cargo builds to the MSVC target. Stage it by copying the MSVC
+    # build over (see CONTRIBUTING.md "Building installers").
+    - name: Build xlsx sidecar and stage at GNU target path
+      shell: pwsh
+      run: |
+        npm run native:build -w @hermesoffice/sheets
+        $gnuDir = "apps/sheets/native/xlsx-engine/target/x86_64-pc-windows-gnu/release"
+        New-Item -ItemType Directory -Force -Path $gnuDir | Out-Null
+        Copy-Item "apps/sheets/native/xlsx-engine/target/release/xlsx-sidecar.exe" "$gnuDir/xlsx-sidecar.exe" -Force
+
     - name: Build Windows Executable
       run: npm run dist:win
 
