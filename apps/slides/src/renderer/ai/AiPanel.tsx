@@ -1337,6 +1337,12 @@ export function AiPanel({
   }
 
   /**
+   * How many extra attempts each page's QC vision pass gets on upstream failures
+   * (502 / 5xx / content-filter blocks are transient — one bad call shouldn't skip QC).
+   */
+  const QC_LLM_RETRIES = 2
+
+  /**
    * Post-generation layout QC: each page landed by this run gets one focused vision pass in a
    * fresh AgentLoop (screenshot + inventory → constrained fixes via execute_slide_script).
    * Each page's edits sit in their own history batch; if the deterministic audit says the page
@@ -1367,7 +1373,9 @@ export function AiPanel({
           continue
         }
         const batchOpened = await window.slidesApi.beginHistoryBatch()
-        const result = await qcSlidePage({
+        // Retry transient upstream failures (502 / 5xx / content-filter blocks) before
+        // giving up — one bad call otherwise skips the page's QC even though the page is fine.
+        let result = await qcSlidePage({
           access,
           transport,
           pageIndex: page,
@@ -1375,6 +1383,31 @@ export function AiPanel({
           systemSuffix: aiLangDirective,
           signal: controller.signal,
         })
+        if (result.error) {
+          for (let attempt = 1; attempt <= QC_LLM_RETRIES && !controller.signal.aborted; attempt++) {
+            result = await qcSlidePage({
+              access,
+              transport,
+              pageIndex: page,
+              screenshot: shot,
+              systemSuffix: aiLangDirective,
+              signal: controller.signal,
+            })
+            if (!result.error) break
+          }
+        }
+        // The vision pass still failed: degrade to a geometry-only pass (no screenshot) so
+        // the page at least gets the deterministic audit instead of being skipped outright.
+        if (result.error && !controller.signal.aborted) {
+          result = await qcSlidePage({
+            access,
+            transport,
+            pageIndex: page,
+            screenshot: null,
+            systemSuffix: aiLangDirective,
+            signal: controller.signal,
+          })
+        }
         const batchId = batchOpened ? await window.slidesApi.endHistoryBatch() : null
         if (controller.signal.aborted) break
         if (result.error) {
