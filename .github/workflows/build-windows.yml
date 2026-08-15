@@ -18,6 +18,19 @@ jobs:
       with:
         node-version: 22
         cache: 'npm'
+        cache-dependency-path: package-lock.json
+
+    # build:all compiles the Rust xlsx-sidecar, so the runner needs cargo.
+    # mirrors the Setup Rust step in ci.yml.
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+
+    - name: Cache cargo (xlsx-sidecar)
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: apps/sheets/native/xlsx-engine
 
     - name: Install Dependencies
       run: npm ci
