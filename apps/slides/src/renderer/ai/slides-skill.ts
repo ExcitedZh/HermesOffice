@@ -246,9 +246,9 @@ Generating a whole deck / adding pages (HTML pipeline first):
 Step 0 Questionnaire (mandatory when creating a whole new deck): first call ask_clarification to show a questionnaire card with 2–4 key trade-off questions for this topic (audience, usage scenario, tone/style, content focus), each with genuinely different options. **The user's choices directly determine the deck's Core Hook and style**; do the planning below only after getting the answers. (Ask only for a whole new deck; adding a few pages or editing needs no questionnaire. The card shows automatically — don't repeat the questions in your reply text.)
 
 Step A Research: when the topic involves facts/attractions/data, run web_search 1–2 times first for real content. **Use real data and facts in the design; no "XX%" or placeholder names**.
-Step B Image strategy: with generate_deck you **don't need image_search in advance** — the system auto-searches internally per page from the planned image_queries keywords and fills real URLs back (each keyword searched once, deduped across pages). **Travel/product/people/brand decks get images by default without the user asking; never fake images with CSS placeholders — slots needing images must be filled with real ones**. Only when redoing a page via regenerate_slide or adding images to existing pages via insert_web_image do you image_search yourself first (English keywords describing a concrete scene like "summer palace kunming lake", not generic words like "park").
+Step B Image strategy: with generate_deck you **don't need image_search in advance** — the system auto-searches internally per page from the planned image_queries keywords and fills real URLs back (each keyword searched once, deduped across pages). **Travel/product/people/brand decks get images by default without the user asking; never fake images with CSS placeholders — slots needing images must be filled with real ones**. Only when redoing a page via regenerate_slide or adding images to existing pages via insert_web_image do you image_search yourself first (keywords in the deck's language describing a concrete scene — Chinese topic → "颐和园昆明湖", English topic → "summer palace kunming lake"; not generic words like "park"/"公园").
 Step C Unified style: first define one design system for the whole deck — primary/secondary colors, title and body font-size scale, content margins, card/corner style (e.g. "teal primary + cream background + sans-serif fresh look"). **Every page's HTML strictly follows the same system; style must be consistent across pages**.
-Step D Generate (call generate_deck): with many pages pass topic + approx_pages + context (feed in the real material from Step A) and let the system plan internally; with few pages you may pass core_hook+style+pages directly (image_queries takes English image-search keywords; **the system auto-searches internally and fills real URLs back**, no image_search needed in advance). The system writes HTML page by page and lands pages as they generate; you don't hand-write HTML.
+Step D Generate (call generate_deck): with many pages pass topic + approx_pages + context (feed in the real material from Step A) and let the system plan internally; with few pages you may pass core_hook+style+pages directly (image_queries takes image-search keywords in the deck's language; **the system auto-searches internally and fills real URLs back**, no image_search needed in advance). The system writes HTML page by page and lands pages as they generate; you don't hand-write HTML.
 Step E Vary layouts per page (avoid sameness): 3 parallel points→three-column cards; a key number→big-number hero; comparison→two columns; sequence→timeline; image+text→left-text-right-image / full-image with text overlay. **Content pages of one deck must not all use the same layout**.
 
 - **generate_deck is the first choice for a whole new deck**: with many pages pass topic+approx_pages+context; the system plans internally (auto-batching over the threshold), **auto-searches images**, writes HTML page by page, and **lands pages onto the canvas as they generate (the user sees them one by one)**. **Neither "only page 1 got generated" nor "arguments were truncated" can happen — the page count is guaranteed by the system loop**.
@@ -266,7 +266,7 @@ Native tools (only for modifying/refining existing pages, not for generating fro
 Search and images:
 - Use web_search when you need current information/data/fact-checking; search before writing anything uncertain, don't fabricate. When generating a whole deck, a round of searching for real material first is recommended.
 - **Figure provenance is enforced at the tool layer**: add_chart / edit_chart (with series) and data-dense generate_deck / regenerate_slide briefs refuse to run without a dataSource declaration; 'search' is only accepted after an actual web_search in this conversation. Fabricating precise numbers (¥21.8-style precision) and delivering them as fact is the worst failure mode — when no real data is available, use dataSource:'sample' and tell the user explicitly that the figures are illustrative.
-- image_search for images (English keywords) → get imageUrl. **Two usages**: 1) when redoing a page via regenerate_slide, pass the imageUrl in image_urls; 2) when adding an image to an existing page, use insert_web_image to insert at a position. (generate_deck searches images internally; no advance search needed for a whole new deck.)
+- image_search for images (keywords in the deck's language) → get imageUrl. **Two usages**: 1) when redoing a page via regenerate_slide, pass the imageUrl in image_urls; 2) when adding an image to an existing page, use insert_web_image to insert at a position. (generate_deck searches images internally; no advance search needed for a whole new deck.)
 - Travel, product, people, and brand decks get images by default without the user asking; mind whitespace between images and text, no overlap.
 - Editing an EXISTING picture: crop_image (non-destructive srcRect), set_picture_opacity, replace_image (in-place swap keeping frame/z-order/border). For "remove this image's background / upscale / edit this image": run generate_image with referenceImageUrls pointing at a source URL you have (an image_search result or one the user provided — embedded picture bytes are not addressable by URL), then replace_image with the returned URL. Never delete+reinsert a picture to change its content — that loses z-order and effects.
 
@@ -496,7 +496,7 @@ const TOOLS: AgentToolDef[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'Image search keywords (English works better)' },
+        query: { type: 'string', description: "Image search keywords (match the deck's language)" },
         maxResults: { type: 'integer', description: 'Max results, default 8' },
       },
       required: ['query'],
@@ -686,7 +686,7 @@ const TOOLS: AgentToolDef[] = [
                 type: 'array',
                 items: { type: 'string' },
                 description:
-                  "English image-search keywords for this page's image slots (one per slot; [] for no images)",
+                  "Image-search keywords in the deck's language for this page's image slots (one per slot; [] for no images)",
               },
             },
             required: ['title', 'brief', 'layout'],
@@ -749,7 +749,7 @@ const TOOLS: AgentToolDef[] = [
       '[First choice for creating a whole new deck — self-driven pipeline: auto image search, page-by-page generation with live display, no missing pages]' +
       ' Recommended usage (especially with many pages): pass only topic + approx_pages (+ optional style/context); the system plans the outline internally (auto-batched beyond 12 pages), **auto-searches images** (no advance image_search — the system searches from the planned image_queries keywords internally and fills real URLs back before writing HTML), writes HTML page by page, and lands pages onto the canvas one by one.' +
       ' You don\'t hand-write dozens of pages, and neither "only page 1 got generated" nor "arguments were truncated" can happen — the page count is guaranteed by the system loop.' +
-      ' (If you already know each page you may pass core_hook+style+pages directly; pages[].image_queries takes English image-search keywords, searched internally; if you already know real http(s) URLs pass them directly — the system respects existing URLs and does not re-search.)' +
+      ' (If you already know each page you may pass core_hook+style+pages directly; pages[].image_queries takes image-search keywords in the deck\'s language, searched internally; if you already know real http(s) URLs pass them directly — the system respects existing URLs and does not re-search.)' +
       ' To add a few pages to an existing deck, pass pages (briefs for just the new pages) + insert_mode:"append".',
     inputSchema: {
       type: 'object',
@@ -796,7 +796,7 @@ const TOOLS: AgentToolDef[] = [
                 type: 'array',
                 items: { type: 'string' },
                 description:
-                  "English image-search keywords for this page's image slots (the system searches internally and fills real URLs back); if you already know real http(s) URLs pass them directly (respected, not re-searched); [] for no images",
+                  "Image-search keywords in the deck's language for this page's image slots (the system searches internally and fills real URLs back); if you already know real http(s) URLs pass them directly (respected, not re-searched); [] for no images",
               },
             },
             required: ['title', 'brief', 'layout'],
@@ -1615,7 +1615,7 @@ export function auditPageHtml(html: string): string | null {
 function imageFailNote(fails?: { page: number; url: string }[]): string {
   if (!fails?.length) return ''
   const detail = fails.map((f) => `page ${f.page} (${f.url})`).join(', ')
-  return `\n⚠️ Missing images: ${detail} failed to download/convert; those image slots are blank on the page. Re-run image_search with more generic English keywords, pick a working image, patch it onto the page with insert_web_image (slideIndex = page number - 1), then reply to the user.`
+  return `\n⚠️ Missing images: ${detail} failed to download/convert; those image slots are blank on the page. Re-run image_search with more generic keywords in the deck's language (or translate them into English for broader coverage), pick a working image, patch it onto the page with insert_web_image (slideIndex = page number - 1), then reply to the user.`
 }
 
 async function executeTool(
@@ -2550,7 +2550,7 @@ async function executeTool(
       }
 
       // ── Step 1.5: in-tool image search —
-      // walk every page's image_queries and replace "English keywords (non-URL)" with real image URLs.
+      // walk every page's image_queries and replace "keywords in the deck's language (non-URL)" with real image URLs.
       // Entries that are already http(s) URLs are respected upstream, not re-searched; pages whose search failed keep an empty array (fail-open).
       // The same keyword is searched once per deck (fetching several candidates at once); allocation skips already-used URLs to avoid duplicate images across pages.
       if (access.searchImages) {
