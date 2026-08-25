@@ -99,6 +99,23 @@ export async function webSearch(
 
 // ── Image search ────────────────────────────────────────────────────
 
+/**
+ * Locale hints derived from the query's script, for image-search backends.
+ * Matching geo/interface language to the keyword language surfaces the right
+ * regional sources (e.g. Chinese keywords → Chinese-image-heavy results);
+ * Latin/other queries keep the historical US/English defaults. webSearch is
+ * intentionally left on the fixed us/en locale. (exported for tests)
+ */
+export function searchLocaleFor(query: string): { gl: string; hl: string; ddg: string } {
+  // Kana first: Japanese text mixes kanji (Han) with kana, so a Han match alone
+  // must not classify a Japanese query as Chinese.
+  if (/[\u3040-\u30ff\u31f0-\u31ff]/.test(query)) return { gl: 'jp', hl: 'ja', ddg: 'jp-ja' }
+  if (/[\uac00-\ud7af\u1100-\u11ff]/.test(query)) return { gl: 'kr', hl: 'ko', ddg: 'kr-ko' }
+  if (/[\u4e00-\u9fff\u3400-\u4dbf]/.test(query)) return { gl: 'cn', hl: 'zh-cn', ddg: 'cn-zh' }
+  if (/[\u0400-\u04ff]/.test(query)) return { gl: 'ru', hl: 'ru', ddg: 'ru-ru' }
+  return { gl: 'us', hl: 'en', ddg: 'us-en' }
+}
+
 export async function imageSearch(
   query: string,
   maxResults = 8,
@@ -117,10 +134,11 @@ export async function imageSearch(
   const key = SERPER_KEY()
   if (key) {
     try {
+      const loc = searchLocaleFor(query)
       const resp = await fetchWithTimeout('https://google.serper.dev/images', {
         method: 'POST',
         headers: { 'X-API-KEY': key, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ q: query, num: Math.min(maxResults, 10), gl: 'us', hl: 'en' }),
+        body: JSON.stringify({ q: query, num: Math.min(maxResults, 10), gl: loc.gl, hl: loc.hl }),
       })
       if (resp.ok) {
         const data = asRecord(await resp.json())
@@ -189,7 +207,7 @@ async function duckImageSearch(query: string, maxResults: number): Promise<Image
     const vqd = /vqd=["']?([\d-]+)["']?/.exec(tokenHtml)?.[1]
     if (!vqd) return []
     const resp = await fetchWithTimeout(
-      `https://duckduckgo.com/i.js?l=us-en&o=json&q=${encodeURIComponent(query)}&vqd=${vqd}`,
+      `https://duckduckgo.com/i.js?l=${searchLocaleFor(query).ddg}&o=json&q=${encodeURIComponent(query)}&vqd=${vqd}`,
       { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://duckduckgo.com/' } },
     )
     const data = asRecord(await resp.json())

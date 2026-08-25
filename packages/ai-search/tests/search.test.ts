@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeAll } from 'vitest'
-import { webSearch, imageSearch } from '../src/index'
+import { webSearch, imageSearch, searchLocaleFor } from '../src/index'
 
 // These cases only test the Serper/DuckDuckGo paths; a local gsk login would take priority, so disable it explicitly
 beforeAll(() => {
@@ -82,5 +82,50 @@ describe('imageSearch (Serper)', () => {
     expect(r.method).toBe('serper')
     expect(r.images).toHaveLength(1) // getty is filtered out
     expect(r.images[0]).toMatchObject({ imageUrl: 'https://cdn.example.com/a.jpg', width: 800, height: 600 })
+  })
+
+  it('Chinese query sends cn/zh-cn locale to Serper; Latin query keeps us/en', async () => {
+    process.env.SERPER_API_KEY = 'test-key'
+    const bodies: Record<string, unknown>[] = []
+    mockFetch((_url, init) => {
+      bodies.push(JSON.parse(String(init?.body ?? '{}')))
+      return { ok: true, json: { images: [{ imageUrl: 'https://cdn.example.com/a.jpg' }] } }
+    })
+    await imageSearch('颐和园昆明湖', 8)
+    await imageSearch('summer palace lake', 8)
+    expect(bodies[0]).toMatchObject({ gl: 'cn', hl: 'zh-cn' })
+    expect(bodies[1]).toMatchObject({ gl: 'us', hl: 'en' })
+  })
+})
+
+describe('imageSearch (DuckDuckGo fallback)', () => {
+  it('region parameter follows the query language (Chinese → cn-zh)', async () => {
+    let ddgUrl = ''
+    mockFetch((url) => {
+      const u = String(url)
+      if (u.includes('/i.js')) {
+        ddgUrl = u
+        return {
+          ok: true,
+          json: { results: [{ image: 'https://cdn.example.com/a.jpg', url: 'https://example.com' }] },
+        }
+      }
+      return { ok: true, text: '<html>vqd="4-126"</html>' }
+    })
+    const r = await imageSearch('颐和园昆明湖', 8)
+    expect(r.method).toBe('duckduckgo')
+    expect(ddgUrl).toContain('l=cn-zh')
+    expect(ddgUrl).toContain(encodeURIComponent('颐和园昆明湖'))
+  })
+})
+
+describe('searchLocaleFor', () => {
+  it('maps query scripts to search locales', () => {
+    expect(searchLocaleFor('summer palace kunming lake')).toEqual({ gl: 'us', hl: 'en', ddg: 'us-en' })
+    expect(searchLocaleFor('颐和园昆明湖')).toEqual({ gl: 'cn', hl: 'zh-cn', ddg: 'cn-zh' })
+    // Japanese mixes kanji with kana — kana must win over the Han check
+    expect(searchLocaleFor('京都の桜')).toEqual({ gl: 'jp', hl: 'ja', ddg: 'jp-ja' })
+    expect(searchLocaleFor('경복궁 야경')).toEqual({ gl: 'kr', hl: 'ko', ddg: 'kr-ko' })
+    expect(searchLocaleFor('Московский кремль')).toEqual({ gl: 'ru', hl: 'ru', ddg: 'ru-ru' })
   })
 })
