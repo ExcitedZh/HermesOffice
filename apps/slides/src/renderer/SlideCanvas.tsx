@@ -32,6 +32,7 @@ import {
   type Guide,
   type SpacingIndicator,
 } from './snap'
+import { tableCellAtPoint, tableLocalPointFromStage } from './table-hit'
 import { NodeBody, StaticNode } from './NodeBody'
 import { ZOOM_PREVIEW_EVENT } from './zoom-preview'
 import { useI18n } from './i18n/locale'
@@ -727,14 +728,9 @@ export function SlideCanvas({
           const raw = e.target.getStage()?.getPointerPosition()
           // Stage coordinates -> slide coordinates (remove the bleed offset)
           const pos = raw ? { x: raw.x - CANVAS_BLEED, y: raw.y - CANVAS_BLEED } : null
-          if (n && n.type === 'table' && !n.box.rotationDeg && pos) {
-            const hit = (n as TableRenderNode).cells.find(
-              (c) =>
-                pos.x - n.box.x >= c.x &&
-                pos.x - n.box.x < c.x + c.w &&
-                pos.y - n.box.y >= c.y &&
-                pos.y - n.box.y < c.y + c.h,
-            )
+          if (n && n.type === 'table' && pos) {
+            const local = tableLocalPointFromStage(pos, n.box)
+            const hit = tableCellAtPoint(n, local)
             if (hit) cell = { row: hit.row, col: hit.col }
           }
         }
@@ -1631,16 +1627,13 @@ function NodeView({
     }
     onEnterGroup(node.sourceId, childId)
   }
-  // Table: double-click hits a cell (pointer coordinates -> table-local coordinates; editing rotated tables not supported yet)
+  // Table: double-click hits a cell in table-local coordinates, regardless of rotation/flip.
   const onTableDblClick = (e: Konva.KonvaEventObject<Event>) => {
-    if (node.type !== 'table' || box.rotationDeg) return
+    if (node.type !== 'table') return
     const pos = e.target.getStage()?.getPointerPosition()
     if (!pos) return
-    const rx = pos.x - CANVAS_BLEED - box.x
-    const ry = pos.y - CANVAS_BLEED - box.y
-    const cell = (node as TableRenderNode).cells.find(
-      (c) => rx >= c.x && rx < c.x + c.w && ry >= c.y && ry < c.y + c.h,
-    )
+    const local = tableLocalPointFromStage(pos, box, CANVAS_BLEED)
+    const cell = tableCellAtPoint(node, local)
     if (cell) onEditTableCell(node.sourceId, cell.row, cell.col)
   }
   // Audio/video (image is the poster frame): double-click opens the playback overlay

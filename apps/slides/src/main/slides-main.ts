@@ -24,6 +24,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync } from 'node:fs'
 import { userInfo } from 'node:os'
 import { dirname, join } from 'node:path'
+import { cleanupExpiredGeneratedPages } from './generated-page-temp'
 import { setGskProxyUrl } from '@hermesoffice/ai-search'
 import { convertHtmlPage } from './html-to-pptx'
 import {
@@ -926,6 +927,11 @@ let ipcRegistered = false
 export function registerSlidesIpc(): void {
   if (ipcRegistered) return
   ipcRegistered = true
+
+  // AI-generated slide pages land in app-owned temp directories; sweep
+  // expired ones at startup (never at land time — markers can be redeemed
+  // more than once), mirroring the sheets pasted-file cleanup.
+  void cleanupExpiredGeneratedPages(app.getPath('temp'))
 
   // shared with the other editor modules — last (identical) registration wins
   ipcMain.removeHandler('app:get-language')

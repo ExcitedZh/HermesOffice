@@ -201,6 +201,8 @@ interface ExcelShellProps {
   /// Session page-layout settings of the active sheet, echoed by the Page
   /// Layout tab's controls (untouched fields show the app default).
   readonly pageLayout: PageLayoutEcho
+  /// Cross-highlight ("reading mode") of the active row/column, echoed by the View checkbox.
+  readonly crossHighlightVisible: boolean
 }
 
 export interface PageLayoutEcho {
@@ -269,6 +271,7 @@ export function ExcelShell({
   onAutoSaveChange,
   selectedChart,
   pageLayout,
+  crossHighlightVisible,
 }: ExcelShellProps): React.JSX.Element {
   const { t } = useI18n()
   const [activeTab, setActiveTab] = useState<RibbonTab>('Home')
@@ -386,6 +389,7 @@ export function ExcelShell({
           sheetHasContent={sheetHasContent}
           sheetProtected={onGetSheetProtection()}
           pageLayout={pageLayout}
+          crossHighlightVisible={crossHighlightVisible}
           selectedChart={selectedChart}
           onRefreshPivot={onRefreshPivot}
           onIsSelectionInPivot={onIsSelectionInPivot}
@@ -987,6 +991,7 @@ function Ribbon({
   sheetHasContent,
   sheetProtected,
   pageLayout,
+  crossHighlightVisible,
   selectedChart,
   onCommand,
   onAiRun,
@@ -1000,6 +1005,7 @@ function Ribbon({
   readonly sheetHasContent: boolean
   readonly sheetProtected: boolean | null
   readonly pageLayout: PageLayoutEcho
+  readonly crossHighlightVisible: boolean
   readonly selectedChart: SelectedChartRibbon | null
   readonly onCommand: (command: string) => void
   /** Open the AI panel and immediately send the given prompt */
@@ -1780,7 +1786,13 @@ function Ribbon({
             symbol="ƒ"
             onClick={() => onCommand('toggle-show-formulas')}
           />
-          <RibbonReserved large menu label={t('appErrorChecking')} symbol="⚠" />
+          <RibbonButton
+            large
+            label={t('appErrorChecking')}
+            detail={t('appErrorCheckingDetail')}
+            symbol="⚠"
+            onClick={() => onCommand('error-checking')}
+          />
           <RibbonReserved large label={t('appWatchWindow')} symbol="👓" />
         </RibbonGroup>
         <RibbonGroup label={t('appGroupCalculation')}>
@@ -1965,6 +1977,14 @@ function Ribbon({
             >
               <i className="check-box">{pageLayout.showGridlines ? '✓' : ''}</i>
               {t('appGridlines')}
+            </button>
+            <button
+              className="check-item"
+              data-tip={t('appCrossHighlight')}
+              onClick={() => onCommand('toggle-cross-highlight')}
+            >
+              <i className="check-box">{crossHighlightVisible ? '✓' : ''}</i>
+              {t('appCrossHighlight')}
             </button>
             <span className="check-item reserved-check">
               <i className="check-box">✓</i>

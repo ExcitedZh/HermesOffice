@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { Lang } from '@hermesoffice/i18n'
 import type { AiStreamChunk } from '@hermesoffice/ai-provider'
 import type { ProjectApi } from '@hermesoffice/project-store'
+import { installDropOpenBridge } from '@hermesoffice/electron-utils/drop-open'
 import { AI_CHANNELS, MARKDOWN_CHANNELS } from '../shared/ipc'
 import type { ExportFormat, MarkdownApi, SaveMode, UiTheme } from '../shared/ipc'
 
@@ -70,3 +71,6 @@ const projectApi: Pick<ProjectApi, 'resolveChat' | 'appendChat' | 'loadChat' | '
 
 contextBridge.exposeInMainWorld('markdownApi', api)
 contextBridge.exposeInMainWorld('projectApi', projectApi)
+
+// open documents dragged from the OS onto this tab as a new shell tab
+installDropOpenBridge()

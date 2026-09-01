@@ -118,9 +118,7 @@ export function Markdown({ text, onLinkClick }: MarkdownProps): React.JSX.Elemen
           )
         }
         if (b.kind === 'ul' || b.kind === 'ol') {
-          const items = b.items.map((it, j) => (
-            <li key={j}>{renderInline(it, onLinkClick)}</li>
-          ))
+          const items = b.items.map((it, j) => <li key={j}>{renderInline(it, onLinkClick)}</li>)
           return b.kind === 'ul' ? <ul key={i}>{items}</ul> : <ol key={i}>{items}</ol>
         }
         return (

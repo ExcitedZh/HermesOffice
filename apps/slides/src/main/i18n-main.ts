@@ -400,8 +400,7 @@ export const tMain = createI18n({
       'Hermes에 로그인되어 있지 않습니다. 아래 "Hermes 로그인"을 눌러 로그인한 뒤 다시 시도하세요',
     errNoApiKey: '{provider}의 API 키가 설정되지 않았습니다',
     errNoModel: '모델 이름이 설정되지 않았습니다',
-    errGskCli:
-      'gsk가 로그인되어 있지 않습니다. 먼저 gsk login을 실행해 Hermes 계정에 로그인하세요',
+    errGskCli: 'gsk가 로그인되어 있지 않습니다. 먼저 gsk login을 실행해 Hermes 계정에 로그인하세요',
     errNoDeckAppend:
       '추가할 수 있는 문서가 없습니다(세션 없음). 먼저 mode:"replace"로 첫 페이지를 생성하거나 네이티브 도구로 페이지를 추가하세요.',
     errAppendFailed: '추가 실패: {reason}',

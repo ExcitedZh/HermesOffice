@@ -11,7 +11,9 @@ import {
   type ICellData,
   type IStyleData,
 } from '@univerjs/core'
-import { columnLabel } from '../domain/cell-address'
+import { columnLabel, formatAddress } from '../domain/cell-address'
+import { ERROR_VALUE_RE } from './ai/workbook-search'
+import { runStreamedErrorCheck } from './error-checking'
 import { transposeChartSeries, type ChartSeriesVisualState } from '../domain/chart-visual'
 import { applyFlashFillTemplate, inferFlashFillTemplate } from '../domain/flash-fill'
 import type {
@@ -547,6 +549,62 @@ export function handleRibbonCommand(ctx: RibbonCommandContext, command: string):
         ctx.setPendingEdits(journalSize(state.editJournal))
       }
       ctx.setMessage(next ? t('appShowingFormulas') : t('appShowingValues'))
+      return
+    }
+    case 'error-checking': {
+      const workbook = runtime.univerAPI.getActiveWorkbook()
+      if (!workbook || !worksheet) return
+      const lazyState = ctx.lazyWorkbookRef.current
+      if (lazyState && !lazyState.flags.preloadComplete) {
+        // Streamed: the cell matrix only holds loaded regions, so page the
+        // whole underlying file instead (same approach as Ctrl+F). The jump
+        // loads the hit's range before scrolling to it.
+        void runStreamedErrorCheck({
+          runtime,
+          lazyWorkbookRef: ctx.lazyWorkbookRef,
+          setMessage: ctx.setMessage,
+          refreshSelectionEcho: () => ctx.refreshSelectionFormatRef.current(),
+        })
+        return
+      }
+      const errors: { row: number; column: number; value: string }[] = []
+      const rows = worksheet.getLastRow() + 1
+      const cols = worksheet.getLastColumn() + 1
+      worksheet.getRange(0, 0, rows, cols).forEach((row, col, cell) => {
+        const v = cell?.v
+        if (typeof v === 'string' && ERROR_VALUE_RE.test(v)) {
+          errors.push({ row, column: col, value: v })
+        }
+        return undefined
+      })
+      if (errors.length === 0) {
+        ctx.setMessage(t('appNoErrorsFound'))
+        return
+      }
+      // Step to the first error after the active cell, wrapping around, so
+      // repeated clicks cycle through all of them.
+      const active = workbook.getActiveRange()
+      const curRow = active?.getRow() ?? -1
+      const curCol = active?.getColumn() ?? -1
+      const sorted = [...errors].sort((a, b) => a.row - b.row || a.column - b.column)
+      const next =
+        sorted.find((e) => e.row > curRow || (e.row === curRow && e.column > curCol)) ?? sorted[0]!
+      worksheet.getRange(next.row, next.column, 1, 1).activate()
+      void runtime.univerAPI.executeCommand('sheet.command.scroll-to-cell', {
+        range: {
+          startRow: next.row,
+          endRow: next.row,
+          startColumn: next.column,
+          endColumn: next.column,
+        },
+      })
+      ctx.setMessage(
+        t('appErrorsFound', {
+          count: errors.length,
+          cell: formatAddress(next.row, next.column),
+          value: next.value,
+        }),
+      )
       return
     }
     case 'trace-precedents':

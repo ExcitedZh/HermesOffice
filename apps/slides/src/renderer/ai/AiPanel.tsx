@@ -246,6 +246,8 @@ interface AiPanelProps {
   onUndo?: () => void
   /** Callback to update the path after AI generation lands on disk (title bar sync) */
   onPathChange?: (path: string) => void
+  /** Overwrite a page's speaker notes (persisted to the pptx, marks the deck dirty) */
+  onSetSpeakerNotes?: (slideIndex: number, text: string) => Promise<boolean>
   /** Generation progress callback (for the canvas top progress bar) */
   onDeckProgress?: (event: DeckProgressEvent | null) => void
   /** Absolute path of the currently open file (for chat history persistence) */
@@ -324,10 +326,13 @@ export function AiPanel({
   onExpand,
   onCollapse,
   onPathChange,
+  onSetSpeakerNotes,
   onDeckProgress,
   currentFilePath,
 }: AiPanelProps) {
   const { t } = useI18n()
+  const onSetSpeakerNotesRef = useRef(onSetSpeakerNotes)
+  onSetSpeakerNotesRef.current = onSetSpeakerNotes
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [chat, setChat] = useState<ChatEntry[]>([])
@@ -744,6 +749,8 @@ export function AiPanel({
       getSelectedIds: () => selectedRef.current,
       applySlide: (i, updated) => applySlideRef.current(i, updated),
       applyDeck: (all, goTo) => applyDeckRef.current(all, goTo),
+      setSpeakerNotes: (i, text) =>
+        onSetSpeakerNotesRef.current?.(i, text) ?? Promise.resolve(false),
       generateFromHtml: async (
         pagesHtml: string[],
         mode?: 'replace' | 'append' | 'insert_at',
@@ -854,7 +861,8 @@ export function AiPanel({
           '- Colored panel/card: <div style="position:absolute;..;background:#..;border-radius:.."><h3>..</h3><p>..</p></div>\n' +
           '- Table: <table style="position:absolute;left:..;top:..;width:..;height:.."><tr><td>..</td>..</tr></table>\n\n' +
           'Rules: fill the canvas edge-to-edge; use the real names/figures/facts from the reference material (never invent percentages or "XX%" placeholders); pick a layout that serves the content; keep text readable (body >= 16px, titles 28-60px); respect the Style Skill colors and fonts for a consistent deck.\n\n' +
-          'Style Skill (use these colors/fonts):\n' + (args.style || '')
+          'Style Skill (use these colors/fonts):\n' +
+          (args.style || '')
         const parts = [
           `Page ${args.pageIndex}/${args.totalPages} — title: ${args.title}`,
           `Brief: ${args.brief}`,
@@ -863,7 +871,9 @@ export function AiPanel({
           args.images?.length
             ? `Real image URLs to use (map them to <img src> slots):\n${args.images.join('\n')}`
             : 'No real images available for this page.',
-          args.context ? `Reference material (all real names/figures/facts come from here; do not invent):\n${args.context.slice(0, 4000)}` : '',
+          args.context
+            ? `Reference material (all real names/figures/facts come from here; do not invent):\n${args.context.slice(0, 4000)}`
+            : '',
         ].filter(Boolean)
         const r = await runLlmOnce(sys, parts.join('\n\n'), undefined, true, args.signal, 4000)
         return r.ok && r.text
@@ -1384,7 +1394,11 @@ export function AiPanel({
           signal: controller.signal,
         })
         if (result.error) {
-          for (let attempt = 1; attempt <= QC_LLM_RETRIES && !controller.signal.aborted; attempt++) {
+          for (
+            let attempt = 1;
+            attempt <= QC_LLM_RETRIES && !controller.signal.aborted;
+            attempt++
+          ) {
             result = await qcSlidePage({
               access,
               transport,

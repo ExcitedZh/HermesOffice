@@ -4,7 +4,13 @@
  * rebuilds; editing a modeled field rebuilds only its group.
  */
 import { describe, expect, it } from 'vitest'
-import { generateParagraphXml, parseDocx, saveDocx, type GenerateContext, type SaveBlock } from '../src/index'
+import {
+  generateParagraphXml,
+  parseDocx,
+  saveDocx,
+  type GenerateContext,
+  type SaveBlock,
+} from '../src/index'
 import { buildDocx } from './helpers/build-docx'
 import { existsSync, readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
@@ -33,9 +39,14 @@ const RICH_RPR =
 const RICH_PARA = `<w:p><w:r>${RICH_RPR}<w:t>富格式文本</w:t></w:r></w:p>`
 
 const UNMODELED_TAGS = [
-  '<w:caps/>', '<w:dstrike/>', '<w:vanish/>',
+  '<w:caps/>',
+  '<w:dstrike/>',
+  '<w:vanish/>',
   'w:themeColor="accent1"',
-  '<w:spacing w:val="20"/>', '<w:w w:val="90"/>', '<w:kern w:val="24"/>', '<w:position w:val="6"/>',
+  '<w:spacing w:val="20"/>',
+  '<w:w w:val="90"/>',
+  '<w:kern w:val="24"/>',
+  '<w:position w:val="6"/>',
   '<w:szCs w:val="32"/>',
   '<w:u w:val="double"/>',
   '<w:bdr w:val="single" w:sz="4" w:space="1" w:color="auto"/>',
@@ -63,10 +74,7 @@ describe('rawRPr passthrough', () => {
     const run = doc.blocks[0].runs![0]
     // Add bold (not there originally): w:b is inserted at its schema position, the other
     // groups keep their original bytes
-    const xml = generateParagraphXml(
-      { type: 'paragraph', runs: [{ ...run, bold: true }] },
-      GEN_CTX,
-    )
+    const xml = generateParagraphXml({ type: 'paragraph', runs: [{ ...run, bold: true }] }, GEN_CTX)
     expect(xml).toContain('<w:b/>')
     // schema order: rFonts < b < caps
     expect(xml.indexOf('<w:rFonts')).toBeLessThan(xml.indexOf('<w:b/>'))
@@ -107,15 +115,22 @@ describe('rawRPr passthrough', () => {
 
   it('adjacent runs with different unmodeled props are not merged at parse', async () => {
     const body =
-      '<w:p><w:r><w:rPr><w:caps/></w:rPr><w:t>大写</w:t></w:r>' +
-      '<w:r><w:t>普通</w:t></w:r></w:p>'
+      '<w:p><w:r><w:rPr><w:caps/></w:rPr><w:t>大写</w:t></w:r>' + '<w:r><w:t>普通</w:t></w:r></w:p>'
     const doc = await parseDocx(await buildDocx({ bodyXml: body }))
     expect(doc.blocks[0].runs).toHaveLength(2) // modeled fields all equal, but rawRPr differs → no merge
   })
 })
 
 const here = dirname(fileURLToPath(import.meta.url))
-const REAL = join(here, '..', '..', '..', 'example', 'docx', 'OpenClaw开源项目调研分析报告文档.docx')
+const REAL = join(
+  here,
+  '..',
+  '..',
+  '..',
+  'example',
+  'docx',
+  'OpenClaw开源项目调研分析报告文档.docx',
+)
 
 // Runs only when the local (gitignored) sample document is present.
 describe.skipIf(!existsSync(REAL))('real document invariant (example/docx)', () => {
@@ -154,7 +169,9 @@ describe.skipIf(!existsSync(REAL))('real document invariant (example/docx)', () 
     const JSZip = (await import('jszip')).default
     const [zBefore, zAfter] = await Promise.all([JSZip.loadAsync(bytes), JSZip.loadAsync(saved)])
     const fileNames = (z: InstanceType<typeof JSZip>) =>
-      Object.keys(z.files).filter((n) => !z.files[n].dir).sort()
+      Object.keys(z.files)
+        .filter((n) => !z.files[n].dir)
+        .sort()
     expect(fileNames(zAfter)).toEqual(fileNames(zBefore))
     for (const name of fileNames(zBefore)) {
       // core.xml is the exception: a real save updates dcterms:modified / cp:revision
@@ -167,7 +184,9 @@ describe.skipIf(!existsSync(REAL))('real document invariant (example/docx)', () 
     }
 
     // Untouched paragraphs' original slices remain; the edited one keeps its character spacing
-    const newXml = new TextDecoder().decode(await zAfter.files['word/document.xml'].async('uint8array'))
+    const newXml = new TextDecoder().decode(
+      await zAfter.files['word/document.xml'].async('uint8array'),
+    )
     let checked = 0
     for (const b of visible) {
       if (b === target || !b.originalXml || b.originalXml.length < 40) continue

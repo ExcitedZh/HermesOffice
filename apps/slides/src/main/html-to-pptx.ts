@@ -247,10 +247,7 @@ function tableCells(node: VNode): string[][] {
   const rows: string[][] = []
   const textOf = (n: VNode): string => {
     if (n.tag === '#text') return n.text ?? ''
-    return n.children
-      .map(textOf)
-      .join('')
-      .trim()
+    return n.children.map(textOf).join('').trim()
   }
   // Simple: collect each <tr> sibling; within, each <td>/<th> text.
   const trs = node.children.filter((c) => c.tag === 'tr')
@@ -321,7 +318,10 @@ function boxFromNode(node: VNode): Box | null {
 const toEmu = (pxVal: number) => Math.round(pxVal * EMU_PER_PX_96)
 
 /** Next <p:cNvPr id> to use on the slide (max existing + 1), mirroring pptx-engine's nextCNvPrId. */
-function slideNextId(slide: { originalXml: string; elements: Array<{ anchor: { originalXml: string } }> }): number {
+function slideNextId(slide: {
+  originalXml: string
+  elements: Array<{ anchor: { originalXml: string } }>
+}): number {
   let max = 1
   const scan = (xml: string) => {
     for (const m of xml.matchAll(/<p:cNvPr\s[^>]*\bid="(\d+)"/g)) max = Math.max(max, Number(m[1]))
@@ -374,8 +374,12 @@ export async function convertHtmlPage(html: string): Promise<ConvertedPage> {
   const root = parseHtml(html)
   const body =
     root.children.find((c) => c.tag === 'body') ??
-    root.children.find((c) => c.tag === 'div' && c.style &&
-      (c.attrs.id === 'slide' || c.attrs['class']?.includes('slide'))) ??
+    root.children.find(
+      (c) =>
+        c.tag === 'div' &&
+        c.style &&
+        (c.attrs.id === 'slide' || c.attrs['class']?.includes('slide')),
+    ) ??
     root
 
   const opened = await openPptx(await createBlankPptx())

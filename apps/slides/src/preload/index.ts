@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import type { ProjectApi } from '@hermesoffice/project-store'
+import { installDropOpenBridge } from '@hermesoffice/electron-utils/drop-open'
 import type {
   AddChartOp,
   AddElementOp,
@@ -370,3 +371,6 @@ const projectApi: ProjectApi = {
   listDocumentReferences: (args) => ipcRenderer.invoke('project:graph:listReferences', args),
 }
 contextBridge.exposeInMainWorld('projectApi', projectApi)
+
+// open documents dragged from the OS onto this tab as a new shell tab
+installDropOpenBridge()

@@ -12,7 +12,9 @@ afterEach(() => {
   delete process.env.SERPER_API_KEY
 })
 
-function mockFetch(handler: (url: string, init?: RequestInit) => { ok: boolean; json?: any; text?: string }) {
+function mockFetch(
+  handler: (url: string, init?: RequestInit) => { ok: boolean; json?: any; text?: string },
+) {
   globalThis.fetch = vi.fn(async (url: any, init: any) => {
     const r = handler(String(url), init)
     return {
@@ -72,8 +74,18 @@ describe('imageSearch (Serper)', () => {
         ok: true,
         json: {
           images: [
-            { title: 'good', imageUrl: 'https://cdn.example.com/a.jpg', link: 'https://example.com', imageWidth: 800, imageHeight: 600 },
-            { title: 'paid', imageUrl: 'https://gettyimages.com/x.jpg', link: 'https://gettyimages.com' },
+            {
+              title: 'good',
+              imageUrl: 'https://cdn.example.com/a.jpg',
+              link: 'https://example.com',
+              imageWidth: 800,
+              imageHeight: 600,
+            },
+            {
+              title: 'paid',
+              imageUrl: 'https://gettyimages.com/x.jpg',
+              link: 'https://gettyimages.com',
+            },
           ],
         },
       }
@@ -81,7 +93,11 @@ describe('imageSearch (Serper)', () => {
     const r = await imageSearch('cats', 8)
     expect(r.method).toBe('serper')
     expect(r.images).toHaveLength(1) // getty is filtered out
-    expect(r.images[0]).toMatchObject({ imageUrl: 'https://cdn.example.com/a.jpg', width: 800, height: 600 })
+    expect(r.images[0]).toMatchObject({
+      imageUrl: 'https://cdn.example.com/a.jpg',
+      width: 800,
+      height: 600,
+    })
   })
 
   it('Chinese query sends cn/zh-cn locale to Serper; Latin query keeps us/en', async () => {
@@ -107,7 +123,9 @@ describe('imageSearch (DuckDuckGo fallback)', () => {
         ddgUrl = u
         return {
           ok: true,
-          json: { results: [{ image: 'https://cdn.example.com/a.jpg', url: 'https://example.com' }] },
+          json: {
+            results: [{ image: 'https://cdn.example.com/a.jpg', url: 'https://example.com' }],
+          },
         }
       }
       return { ok: true, text: '<html>vqd="4-126"</html>' }
@@ -121,7 +139,11 @@ describe('imageSearch (DuckDuckGo fallback)', () => {
 
 describe('searchLocaleFor', () => {
   it('maps query scripts to search locales', () => {
-    expect(searchLocaleFor('summer palace kunming lake')).toEqual({ gl: 'us', hl: 'en', ddg: 'us-en' })
+    expect(searchLocaleFor('summer palace kunming lake')).toEqual({
+      gl: 'us',
+      hl: 'en',
+      ddg: 'us-en',
+    })
     expect(searchLocaleFor('颐和园昆明湖')).toEqual({ gl: 'cn', hl: 'zh-cn', ddg: 'cn-zh' })
     // Japanese mixes kanji with kana — kana must win over the Han check
     expect(searchLocaleFor('京都の桜')).toEqual({ gl: 'jp', hl: 'ja', ddg: 'jp-ja' })

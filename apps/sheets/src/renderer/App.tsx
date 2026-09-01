@@ -241,6 +241,13 @@ import { installRuleDetail } from './univer-rule-detail'
 import { installFormulaNullResultFix } from './formula-null-result'
 import { installNumberFormatFix } from './numfmt-fix'
 import { installRateFallback } from './rate-function'
+import { installLazyFindBridge } from './lazy-find'
+import {
+  installCrossHighlight,
+  loadCrossHighlightPreference,
+  storeCrossHighlightPreference,
+  type CrossHighlightHandle,
+} from './cross-highlight'
 import {
   handleRibbonCommand as handleRibbonCommandImpl,
   type RibbonCommandContext,
@@ -376,6 +383,10 @@ export function App(): React.JSX.Element {
   const [autoSave, setAutoSave] = useState(
     () => localStorage.getItem('ai-sheets-auto-save') === '1',
   )
+  /// Cross-highlight ("reading mode") of the active row/column, persisted in
+  /// localStorage like the auto-save flag; off until the user opts in.
+  const [crossHighlightVisible, setCrossHighlightVisible] = useState(loadCrossHighlightPreference)
+  const crossHighlightRef = useRef<CrossHighlightHandle | null>(null)
   // Ref mirror for callbacks captured when an AI run starts
   const autoSaveRef = useRef(autoSave)
   autoSaveRef.current = autoSave
@@ -1281,6 +1292,35 @@ export function App(): React.JSX.Element {
     // Rule-management panels show what each rule actually does: list options /
     // source range, CF formula text, ⚠ on #REF! dead rules.
     const ruleDetailDisposable = installRuleDetail(runtime)
+    // Ctrl+F covers every row of a streamed workbook, not just the loaded
+    // window: the bridge pages the underlying file for out-of-window hits.
+    const lazyFindDisposable = installLazyFindBridge({ runtime, lazyWorkbookRef, setMessage })
+    // Cross-highlight bands track the active cell while the View toggle is on.
+    crossHighlightRef.current = installCrossHighlight(runtime, {
+      extents: () => {
+        // Mirror page-break preview: bands must reach past the data extent,
+        // so take the max of the file-backed numbers (shifted through the
+        // journal's structural ops) and whatever has already streamed in —
+        // clicking a legitimate grid cell beyond the last data row keeps its
+        // row/column highlighted.
+        const state = lazyWorkbookRef.current
+        const worksheet = univerRef.current?.univerAPI.getActiveWorkbook()?.getActiveSheet()
+        if (!worksheet) return null
+        const sheetId = worksheet.getSheetId()
+        const loadedRows = worksheet.getLastRow() + 1
+        const loadedColumns = worksheet.getLastColumn() + 1
+        const fileSheet = state?.file.sheets.find((sheet) => sheet.id === sheetId)
+        if (!state || !fileSheet) {
+          return { rows: loadedRows, columns: loadedColumns }
+        }
+        const ops = state.editJournal.structuralOps.get(sheetId) ?? []
+        return {
+          rows: Math.max(fileSheet.rowCount + netAxisDelta(ops, 'row'), loadedRows),
+          columns: Math.max(fileSheet.columnCount + netAxisDelta(ops, 'column'), loadedColumns),
+        }
+      },
+    })
+    crossHighlightRef.current.setVisible(crossHighlightVisible)
     const scrollDisposable = runtime.univerAPI.addEvent(
       runtime.univerAPI.Event.Scroll,
       (params) => {
@@ -2087,6 +2127,9 @@ export function App(): React.JSX.Element {
       nullResultDisposable.dispose()
       copyMaterializeDisposable.dispose()
       ruleDetailDisposable()
+      lazyFindDisposable.dispose()
+      crossHighlightRef.current?.dispose()
+      crossHighlightRef.current = null
       scrollDisposable.dispose()
       zoomDisposable.dispose()
       editStartDisposable.dispose()
@@ -2113,6 +2156,11 @@ export function App(): React.JSX.Element {
       univerRef.current = null
     }
   }, [])
+
+  // The bands live outside React; mirror the toggle into the installer.
+  useEffect(() => {
+    crossHighlightRef.current?.setVisible(crossHighlightVisible)
+  }, [crossHighlightVisible])
 
   function handleSend(
     overrideInstruction?: string,
@@ -2720,6 +2768,13 @@ export function App(): React.JSX.Element {
   }
 
   function handleRibbonCommand(command: string): void {
+    if (command === 'toggle-cross-highlight') {
+      const next = !crossHighlightVisible
+      setCrossHighlightVisible(next)
+      storeCrossHighlightPreference(next)
+      setMessage(t(next ? 'appCrossHighlightOn' : 'appCrossHighlightOff'))
+      return
+    }
     handleRibbonCommandImpl(ribbonContext(), command)
   }
 
@@ -3178,6 +3233,7 @@ export function App(): React.JSX.Element {
         onRedo={handleRedo}
         autoSave={autoSave}
         onAutoSaveChange={setAutoSave}
+        crossHighlightVisible={crossHighlightVisible}
         selectedChart={selectedChart}
         onGetSortColumns={sortColumnOptions}
         onGetSheetProtection={sheetProtectionEcho}

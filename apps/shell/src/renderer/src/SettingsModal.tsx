@@ -184,9 +184,14 @@ export function SettingsModal({
   }
 
   const changeSaveDir = () => {
-    void window.aiOffice.pickDefaultSaveDir?.().then((dir) => {
-      if (dir) setSaveDir(dir)
-    })
+    window.aiOffice
+      .pickDefaultSaveDir?.()
+      .then((dir) => {
+        if (dir) setSaveDir(dir)
+      })
+      .catch((error) => {
+        window.alert(error instanceof Error ? error.message : String(error))
+      })
   }
 
   const loggedIn = status?.loggedIn ?? false

@@ -29,6 +29,7 @@ import type {
   TransitionKind,
 } from '../shared/ipc'
 import { SlideCanvas, selectionChromeColor } from './SlideCanvas'
+import { tableCellOverlayBox } from './table-hit'
 import { ZOOM_PREVIEW_EVENT } from './zoom-preview'
 import type { DrawRect } from './draw-shape'
 import { SlideThumb } from './SlideThumb'
@@ -1750,13 +1751,7 @@ export function App() {
       type: 'shape',
       sourceId: tbl.sourceId,
       box: {
-        x: tbl.box.x + cell.x,
-        y: tbl.box.y + cell.y,
-        w: cell.w,
-        h: cell.h,
-        rotationDeg: 0,
-        flipH: false,
-        flipV: false,
+        ...tableCellOverlayBox(tbl.box, cell),
       },
       fill: { kind: 'none' },
       ...(cell.text ? { text: cell.text } : {}),
@@ -2546,6 +2541,17 @@ export function App() {
                   setPath(p)
                   setDirty(false)
                 }}
+                onSetSpeakerNotes={(i, text) =>
+                  flushNotes()
+                    .then(() => window.slidesApi.setNotes({ slideIndex: i, text }))
+                    .then((ok) => {
+                      if (ok) {
+                        setDirty(true)
+                        if (i === current) setNotesText(text)
+                      }
+                      return ok
+                    })
+                }
                 currentFilePath={path}
               />
             ) : (

@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Lang } from '@hermesoffice/i18n'
 import type { AiStreamChunk } from '@hermesoffice/ai-provider'
+import { installDropOpenBridge } from '@hermesoffice/electron-utils/drop-open'
 import { AI_CHANNELS, PDF_CHANNELS } from '../shared/ipc'
 import type { PdfApi, UiTheme } from '../shared/ipc'
 
@@ -63,3 +64,6 @@ const api: PdfApi = {
 }
 
 contextBridge.exposeInMainWorld('pdfApi', api)
+
+// open documents dragged from the OS onto this tab as a new shell tab
+installDropOpenBridge()

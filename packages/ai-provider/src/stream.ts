@@ -24,16 +24,25 @@ export async function* sseLines(
   let buffer = ''
   const stream = body as ReadableStream<Uint8Array>
   const reader = stream.getReader()
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    onBytes?.()
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() ?? ''
-    for (const line of lines) yield line
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      onBytes?.()
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+      for (const line of lines) yield line
+    }
+    if (buffer) yield buffer
+  } finally {
+    // The consumer may abandon this generator mid-stream (an in-band gateway
+    // error thrown inside the for-await loop calls .return()). Without this
+    // cleanup the reader stays locked and the underlying socket is not
+    // returned to the pool until GC nondeterministically finalizes it.
+    await reader.cancel().catch(() => undefined)
+    reader.releaseLock()
   }
-  if (buffer) yield buffer
 }
 
 export interface StreamCallbacks {
@@ -342,12 +351,19 @@ async function anthropicTurn(
     if (!line.startsWith('data:')) continue
     const payload = line.slice(5).trim()
     if (!payload) continue
-    const event = JSON.parse(payload) as {
+    // A truncated frame or a non-JSON keep-alive from a proxy should skip
+    // that event, not kill the entire AI turn with a parser error.
+    let event: {
       type?: string
       index?: number
       content_block?: { type?: string; id?: string; name?: string }
       delta?: { type?: string; text?: string; partial_json?: string; stop_reason?: string }
       error?: { message?: string } | string
+    }
+    try {
+      event = JSON.parse(payload) as typeof event
+    } catch {
+      continue
     }
     if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
       pendingTools.set(event.index ?? 0, {
@@ -563,7 +579,9 @@ async function geminiTurn(
     if (!line.startsWith('data:')) continue
     const payload = line.slice(5).trim()
     if (!payload) continue
-    const event = JSON.parse(payload) as {
+    // A truncated frame or a non-JSON keep-alive from a proxy should skip
+    // that event, not kill the entire AI turn with a parser error.
+    let event: {
       candidates?: Array<{
         content?: {
           parts?: Array<{
@@ -575,6 +593,11 @@ async function geminiTurn(
       }>
       promptFeedback?: { blockReason?: string }
       error?: { message?: string } | string
+    }
+    try {
+      event = JSON.parse(payload) as typeof event
+    } catch {
+      continue
     }
     if (event.error) throw new Error(sseErrorText(event.error, 'Gemini stream error'))
     if (event.promptFeedback?.blockReason) {
@@ -801,7 +824,9 @@ async function openAiCompatibleTurn(
     const payload = line.slice(5).trim()
     if (!payload) continue
     if (payload === '[DONE]') break
-    const event = JSON.parse(payload) as {
+    // A truncated frame or a non-JSON keep-alive from a proxy should skip
+    // that event, not kill the entire AI turn with a parser error.
+    let event: {
       choices?: Array<{
         delta?: {
           content?: string
@@ -814,6 +839,11 @@ async function openAiCompatibleTurn(
         finish_reason?: string | null
       }>
       error?: { message?: string } | string
+    }
+    try {
+      event = JSON.parse(payload) as typeof event
+    } catch {
+      continue
     }
     if (event.error) throw new Error(sseErrorText(event.error, 'Model stream error'))
     const choice = event.choices?.[0]

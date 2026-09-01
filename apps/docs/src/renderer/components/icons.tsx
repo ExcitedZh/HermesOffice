@@ -1510,13 +1510,25 @@ export function HermesMark({ size = 30 }: { size?: number }) {
       aria-hidden
     >
       <defs>
-        <linearGradient id="hermes-mark-grad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+        <linearGradient
+          id="hermes-mark-grad"
+          x1="0"
+          y1="0"
+          x2="24"
+          y2="24"
+          gradientUnits="userSpaceOnUse"
+        >
           <stop stopColor="#6E4FF6" />
           <stop offset="1" stopColor="#2DD4BF" />
         </linearGradient>
       </defs>
       <rect x="0.75" y="0.75" width="22.5" height="22.5" rx="6" fill="url(#hermes-mark-grad)" />
-      <path d="M7.25 6.25v11.5M16.75 6.25v11.5M7.25 12h9.5" stroke="#ffffff" strokeWidth="2.4" strokeLinecap="round" />
+      <path
+        d="M7.25 6.25v11.5M16.75 6.25v11.5M7.25 12h9.5"
+        stroke="#ffffff"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+      />
     </svg>
   )
 }

@@ -90,7 +90,8 @@ export function FormLayer({
             ...base,
             kind: 'checkbox',
             value: '',
-            checked: typeof a.fieldValue === 'string' && a.fieldValue !== 'Off' && a.fieldValue !== '',
+            checked:
+              typeof a.fieldValue === 'string' && a.fieldValue !== 'Off' && a.fieldValue !== '',
           })
         } else if (a.fieldType === 'Btn' && a.radioButton) {
           out.push({
@@ -105,7 +106,9 @@ export function FormLayer({
             kind: 'choice',
             value: fieldValueStr(a.fieldValue),
             options: (a.options ?? [])
-              .filter((o) => typeof o.exportValue === 'string' || typeof o.displayValue === 'string')
+              .filter(
+                (o) => typeof o.exportValue === 'string' || typeof o.displayValue === 'string',
+              )
               .map((o) => ({
                 exportValue: String(o.exportValue ?? o.displayValue),
                 displayValue: String(o.displayValue ?? o.exportValue),
@@ -136,7 +139,9 @@ export function FormLayer({
               style={style}
               disabled={readOnly || w.readOnly}
               checked={edit ? !!edit.checked : w.checked}
-              onChange={(e) => onEdit({ name: w.fieldName, kind: 'checkbox', checked: e.target.checked })}
+              onChange={(e) =>
+                onEdit({ name: w.fieldName, kind: 'checkbox', checked: e.target.checked })
+              }
             />
           )
         }

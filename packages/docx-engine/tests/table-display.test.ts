@@ -42,7 +42,12 @@ describe('table display model', () => {
 
     const header = table.rows[0]
     expect(header.map((c) => c.paras[0])).toEqual(['排名', '品牌', '份额'])
-    expect(header[0]).toMatchObject({ fill: '1F3864', color: 'FFFFFF', bold: true, align: 'center' })
+    expect(header[0]).toMatchObject({
+      fill: '1F3864',
+      color: 'FFFFFF',
+      bold: true,
+      align: 'center',
+    })
 
     const dataRow = table.rows[1]
     expect(dataRow[1].colSpan).toBe(2)

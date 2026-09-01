@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
+import { installDropOpenBridge } from '@hermesoffice/electron-utils/drop-open'
 import type {
   AccountLoginEvent,
   AccountStatus,
@@ -305,3 +306,6 @@ const cloudApi: CloudApi = {
 }
 
 contextBridge.exposeInMainWorld('aiOfficeCloud', cloudApi)
+
+// open documents dragged from the OS anywhere over Home or the tab strip
+installDropOpenBridge()

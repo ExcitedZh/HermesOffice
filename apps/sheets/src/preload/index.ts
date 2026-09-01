@@ -7,6 +7,7 @@ import type {
   GatewayAccountStatus,
 } from '@hermesoffice/ai-provider'
 import type { ProjectApi } from '@hermesoffice/project-store'
+import { installDropOpenBridge } from '@hermesoffice/electron-utils/drop-open'
 import type {
   AttachmentAddResult,
   AttachmentImageResult,
@@ -446,6 +447,9 @@ const projectApi: ProjectApi = {
   listDocumentReferences: (args) => ipcRenderer.invoke('project:graph:listReferences', args),
 }
 contextBridge.exposeInMainWorld('projectApi', projectApi)
+
+// open documents dragged from the OS onto this tab as a new shell tab
+installDropOpenBridge()
 
 function parseWorkbookFile(input: unknown): WorkbookFile {
   if (!isRecord(input)) throw new Error('Invalid workbook response.')

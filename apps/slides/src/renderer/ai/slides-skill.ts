@@ -101,6 +101,11 @@ export interface DeckAccess {
   /** Survey: shows a card with options and waits for the user's choices, returning an answer summary. */
   askClarification?(questions: ClarifyQuestion[]): Promise<{ answers: string; cancelled?: boolean }>
   /**
+   * Overwrite the speaker notes of a page (persisted into the pptx notesSlide part,
+   * undoable, marks the document dirty). Empty text clears the notes.
+   */
+  setSpeakerNotes?(slideIndex: number, text: string): Promise<boolean>
+  /**
    * In-tool image search (embedded in the tool):
    * given English keywords, returns an array of real image URLs (at most N).
    * On search failure returns an empty array (fail-open; doesn't block the main generation path).
@@ -749,7 +754,7 @@ const TOOLS: AgentToolDef[] = [
       '[First choice for creating a whole new deck — self-driven pipeline: auto image search, page-by-page generation with live display, no missing pages]' +
       ' Recommended usage (especially with many pages): pass only topic + approx_pages (+ optional style/context); the system plans the outline internally (auto-batched beyond 12 pages), **auto-searches images** (no advance image_search — the system searches from the planned image_queries keywords internally and fills real URLs back before writing HTML), writes HTML page by page, and lands pages onto the canvas one by one.' +
       ' You don\'t hand-write dozens of pages, and neither "only page 1 got generated" nor "arguments were truncated" can happen — the page count is guaranteed by the system loop.' +
-      ' (If you already know each page you may pass core_hook+style+pages directly; pages[].image_queries takes image-search keywords in the deck\'s language, searched internally; if you already know real http(s) URLs pass them directly — the system respects existing URLs and does not re-search.)' +
+      " (If you already know each page you may pass core_hook+style+pages directly; pages[].image_queries takes image-search keywords in the deck's language, searched internally; if you already know real http(s) URLs pass them directly — the system respects existing URLs and does not re-search.)" +
       ' To add a few pages to an existing deck, pass pages (briefs for just the new pages) + insert_mode:"append".',
     inputSchema: {
       type: 'object',
@@ -1118,6 +1123,23 @@ const TOOLS: AgentToolDef[] = [
         color: { type: 'string', description: '#RRGGBB' },
       },
       required: ['slideIndex', 'color'],
+    },
+  },
+  {
+    name: 'set_speaker_notes',
+    description:
+      'Overwrite the speaker notes (演讲者备注/备注) of a page. Notes are shown in presenter view and saved into the .pptx notesSlide part; they do not affect canvas content. text replaces the page\'s current notes entirely; pass text:"" to clear them. Call when the user asks to add/update/remove notes for a page.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slideIndex: { type: 'integer', description: 'Page number (0-based)' },
+        text: {
+          type: 'string',
+          description:
+            'Full speaker notes text; paragraphs separated by newlines. Empty string clears the notes.',
+        },
+      },
+      required: ['slideIndex', 'text'],
     },
   },
   {
@@ -3338,6 +3360,22 @@ async function executeTool(
             : `Set the background of page ${idx + 1} to ${color}.`,
         mutated: true,
         summary: idx === -1 ? t('aiSumBackgroundAll') : t('aiSumBackground', { n: idx + 1 }),
+      }
+    }
+
+    case 'set_speaker_notes': {
+      const idx = Number(call.input.slideIndex)
+      if (!slides[idx])
+        return fail(t('aiFailSpeakerNotes'), `slideIndex out of range (0-${slides.length - 1})`)
+      const text = String(call.input.text ?? '')
+      const ok = await access.setSpeakerNotes?.(idx, text)
+      if (!ok) return fail(t('aiFailSpeakerNotes'), 'Writing speaker notes failed')
+      return {
+        output: text
+          ? `Wrote speaker notes for page ${idx + 1} (${text.length} characters).`
+          : `Cleared speaker notes for page ${idx + 1}.`,
+        mutated: true,
+        summary: t('aiSumSpeakerNotes', { n: idx + 1 }),
       }
     }
 
