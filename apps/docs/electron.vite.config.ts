@@ -19,7 +19,9 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin({ exclude: ['@hermesoffice/electron-utils'] })],
     resolve: { alias: localAlias },
   },
-  preload: {},
+  preload: {
+    plugins: [externalizeDepsPlugin({ exclude: ['@hermesoffice/electron-utils'] })],
+  },
   renderer: {
     plugins: [react()],
     resolve: { alias: localAlias },

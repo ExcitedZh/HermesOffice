@@ -2523,13 +2523,21 @@ function registerTabsIpc(): void {
 // ---- home menu ----
 
 async function openFileViaDialog(): Promise<void> {
-  const win = shellWindow ?? BrowserWindow.getFocusedWindow()
-  if (!win) return
-  const result = await showOpenDialogWithMemory(dialog, win, {
-    filters: [{ name: tm('filterSupported'), extensions: OPEN_DIALOG_EXTENSIONS }],
-    properties: ['openFile'],
-  })
-  if (!result.canceled && result.filePaths[0]) openDocumentPath(result.filePaths[0])
+  try {
+    const win = shellWindow ?? BrowserWindow.getFocusedWindow() ?? undefined
+    const result = await showOpenDialogWithMemory(
+      dialog,
+      win,
+      {
+        filters: [{ name: tm('filterSupported'), extensions: OPEN_DIALOG_EXTENSIONS }],
+        properties: ['openFile'],
+      },
+      defaultSaveDir(),
+    )
+    if (!result.canceled && result.filePaths[0]) openDocumentPath(result.filePaths[0])
+  } catch (err) {
+    console.error('[shell] open file dialog error:', err)
+  }
 }
 
 function buildHomeMenu(): void {
