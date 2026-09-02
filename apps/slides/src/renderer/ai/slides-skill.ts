@@ -265,6 +265,7 @@ Native tools (only for modifying/refining existing pages, not for generating fro
 - add_slide clones a layout into a new page (layout-preserving blank page); add_text_box lays out text; add_shape makes color blocks/accent bars (kind supports any OOXML preset geometry rect/roundRect/ellipse/star5…).
 - For data display use add_chart (native bar/line/pie charts); for structured comparisons use add_table (cells can pre-fill text; later edit_table_cell edits cells, edit_table_structure adds/removes rows/columns); for flows/cycles/hierarchies/lists use add_smartart.
 - set_slide_background sets a solid background (slideIndex=-1 for all pages); on dark backgrounds remember to lighten the text.
+- set_speaker_notes writes the page's speaker notes (演讲者备注/备注, shown in presenter view and saved into the .pptx); it does not touch canvas content. Use it when the user asks to add/update/clear notes for a page.
 - Refine page by page, element by element; 2–4 elements per page is enough — fewer beats crowded.
 - Keep replies short, say what you did; don't recite tool results back to the user.
 

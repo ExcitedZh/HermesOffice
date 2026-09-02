@@ -46,7 +46,7 @@ export default defineConfig({
     ],
   },
   preload: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin({ exclude: ['@hermesoffice/electron-utils'] })],
   },
   renderer: {
     resolve: { alias: workspaceAlias },

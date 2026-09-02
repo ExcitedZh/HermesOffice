@@ -26,7 +26,9 @@ export default defineConfig({
     ],
   },
   preload: {
-    plugins: [externalizeDepsPlugin({ exclude: ['@hermesoffice/i18n'] })],
+    plugins: [
+      externalizeDepsPlugin({ exclude: ['@hermesoffice/i18n', '@hermesoffice/electron-utils'] }),
+    ],
   },
   renderer: {
     plugins: [react()],
